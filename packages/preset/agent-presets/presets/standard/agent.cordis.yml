@@ -23,10 +23,10 @@
 # `{{model}}` and `{{cwd}}` resolve from the agent's own route and workspace.
 - id: persona
   name: '@deepseek-ai/dsh-persona'
+  # [dsh-purge] identity stripped
   config:
     suffix: Your working directory is {{cwd}}.
-    prefix: >-
-      You are a coding agent powered by the {{model}} model.
+    prefix: ""
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'

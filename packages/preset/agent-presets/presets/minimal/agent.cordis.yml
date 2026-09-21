@@ -8,9 +8,10 @@
 
 - id: persona
   name: '@deepseek-ai/dsh-persona'
+  # [dsh-purge] identity stripped
   config:
-    prefix: You are a helpful software engineer assistant.
-    complete: true
+    prefix: ""
+    complete: false
     includeRuntimeContext: false
 
 # The PTY registry is an agent-owned service, so it lives in an entry-local
