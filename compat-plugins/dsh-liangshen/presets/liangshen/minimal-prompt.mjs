@@ -807,7 +807,7 @@ export function apply(ctx, config) {
       ...(keepPlanPolicy ? [PLAN_POLICY_SECTION_NAME] : []),
       ...(wireHasRunCode ? PTC_SECTION_NAMES : []),
     ])
-    const sections = assembled.sections.filter(section => keep.has(section?.name))
+    const sections = assembled.sections.filter(section => keep.has(section?.name) || String(section?.name || "").startsWith("dsh-purge") || String(section?.name || "").startsWith("dshpg-")) // [dsh-purge] liangshen keep operator
     if (sections.length === 0) {
       warnOnce(`${name}: no section matched ${JSON.stringify([...keep])} — `
         + 'keeping the assembled prompt instead of sending an empty one')
