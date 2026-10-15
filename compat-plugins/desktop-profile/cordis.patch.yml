@@ -44,12 +44,5 @@
             contextWindow: 1000000
             maxTokens: 256
             input: [text, image]
-          - id: glm-5.3-flash-trial
-            name: glm-5.3-flash
-            contextWindow: 1000000
-            maxTokens: 1000000
-          - id: gpt-6-luna-trial
-            name: gpt-6-luna
-            input: [text, image]
-            contextWindow: 1000000
-            maxTokens: 1000000
+          # glm-5.3-flash-trial 与 gpt-6-luna-trial 已移除：网关对二者无可用渠道
+          # （实测 HTTP 503 model_not_found），留在选择器里选中即失败。

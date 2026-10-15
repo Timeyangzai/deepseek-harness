@@ -5,7 +5,9 @@
   "dshPurgeCommit": "6c1d638d1bdcc45ede50fc30249c753d58122a51",
   "dshLiangshen": "0.4.6",
   "opencodeZenFreeProvider": "0.1.23",
-  "opencodeZenStatus": "catalog-loaded; upstream FreeTierError on generation",
+  "opencodeZenStatus": "local-patch-snapshot; matches installed plugin; live API not retested for upload",
+  "opencodeZenPatch": "desktop-profile/patches/opencode-zen-free-provider-0.1.23-free-tier-gate.patch",
+  "opencodeZenPatchedEntrySha256": "6f272a5aa4db3ed737d0c7081b208b66861147739add25ed2775dc484a94da31",
   "disabledPurgePatches": [85, 86],
   "verifiedDate": "2026-10-15",
   "verifiedPlatform": "macOS arm64"

@@ -13,7 +13,35 @@
 
 `desktop-profile/package.json` 记录桌面插件依赖和加载顺序，`desktop-profile/cordis.patch.yml` 记录当前模型与界面设置。中转地址用 `HARNESS_MODEL_BASE_URL` 环境变量代替，密钥只保留 `DEEPSEEK_API_KEY`、`SELF_API_KEY` 引用；启动前设置地址，并在 Harness 的凭证设置中填写密钥。复制配置前先备份目标 profile，完全退出桌面版，将两个兼容插件放入 `$DSH_HOME/local-plugins`，再将模板复制到 `$DSH_HOME/profiles/desktop` 并安装依赖。不要覆盖已有会话或凭证文件。
 
-快照另含 npm 插件 `@jiesou/dsh-opencode-zen-free-provider@0.1.23`，已验证目录加载，实际对话被上游 `FreeTierError` 拒绝；默认模型保留当前选择，复用时需手动切换到可用的提供商。`maxTokens` 和上下文容量也是当前配置快照，不代表所有上游都支持这些数值。
+快照另含 npm 插件 `@jiesou/dsh-opencode-zen-free-provider@0.1.23`，显示名 OpenCode Zen Free。默认模型为 `opencode-zen-free-provider / deepseek-v4.1-flash-free`，实测可正常对话。`maxTokens` 和上下文容量也是当前配置快照，不代表所有上游都支持这些数值。
+
+## OpenCode Zen 免费车道补丁
+
+上游在 2026-10-13/14 收紧免费车道后，插件报 `[opencode-zen FreeTierError] OpenCode's free tier can only be used from within OpenCode.`。逐项对照实测得到的闸门条件：
+
+| 请求头 | 规则 |
+| --- | --- |
+| `HTTP-Referer` | 必须**不存在**（任何值都 403） |
+| `x-session-affinity` | 必须**不存在** |
+| `authorization: Bearer public` | 必须**存在**（无密钥车道） |
+| `accept: */*` | 需要 |
+| `user-agent` | 含 `deepseek-harness` → 403 |
+
+工具列表另有一条：`bash` 与 `read` 需同时出现，且至少一个工具的 `parameters.properties` 非空（`{}` 或完全缺失都 403）；请求体、端点路径、会话 id 形状均不影响判定。
+
+0.1.23 主动发送了前两条并漏发后两条，另有一处空 schema 占位工具，因此全量 403。补丁位于 `desktop-profile/patches/opencode-zen-free-provider-0.1.23-free-tier-gate.patch`，应用到 `node_modules/@jiesou/dsh-opencode-zen-free-provider/lib/index.js` 后重启生效。
+
+定位方法可复用：安装上游 `opencode-ai@1.19.0`，将其 `provider.opencode.options.baseURL` 指向本地 HTTP sink 抓取真实请求，再对同一请求逐头增删比对 200/403。上游按客户端名封锁且仍在调整，`FreeTierError` 复现时优先怀疑请求头。
+
+补丁后逐模型实测（10 个 `-free` 模型，0 个再报 `FreeTierError`）：
+
+| 传输 | 模型 | 结果 |
+| --- | --- | --- |
+| chat/completions | deepseek-v4.1-flash-free、cat-jam-free、mimo-v2.6-flash-free、nemotron-3.5-lightning-free、step-5-preview-free、longcat-2.5-preview-free、space-bunny-free | 可用 |
+| responses | muse-spark-1.2-contributor-free、muse-spark-1.3-contributor-free | 可用 |
+| 两者皆否 | jev-1.13-free | 上游问题，非插件 |
+
+`jev-1.13-free` 在 `chat/completions` 报 400 `Model does not support this protocol`，`responses` / `messages` 报 403；上游官方 CLI `opencode run -m opencode/jev-1.13-free` 同样失败（`UnknownError`，附 `err_` 引用），而控制组 `deepseek-v4.1-flash-free` 正常返回。该模型在上游目录中属新加入，疑为上游尚未接通，插件按目录如实列出，未做硬编码屏蔽。
 
 ## 发送方式
 

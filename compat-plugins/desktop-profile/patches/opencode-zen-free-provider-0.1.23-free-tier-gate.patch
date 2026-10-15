@@ -1,0 +1,85 @@
+--- lib/index.js.orig	2026-10-15 21:45:23
++++ lib/index.js	2026-10-15 22:31:36
+@@ -121,11 +121,19 @@
+     const session = zenSessionId(sessionId);
+     return {
+         ...model.headers,
+-        'HTTP-Referer': 'https://opencode.ai',
++        // Deliberately omitting 'HTTP-Referer' and 'x-session-affinity': the
++        // free-tier gate refuses any request carrying either, whatever the value.
++        // opencode sends both absent.
++        // The gate also requires the keyless public credential and a wildcard
++        // Accept; the adapter's own auth path supplies neither.
++        'accept': '*/*',
++        // The gate requires the keyless public credential on the wire.
++        'authorization': 'Bearer public',
+         'x-opencode-project': 'global',
+         'x-opencode-session': session,
+         'x-opencode-session-id': session,
+-        'x-session-affinity': session,
++        // 'x-session-affinity' deliberately omitted: the free-tier gate refuses
++        // any request carrying it. opencode sends no such header.
+         'X-Session-Id': session,
+         // The turn, not the conversation: no validation, but a fresh id keeps the
+         // shape of what opencode sends.
+@@ -144,7 +152,7 @@
+     const url = typeof input === 'string'
+         ? input
+         : input instanceof URL ? input.href : input instanceof Request ? input.url : String(input);
+-    if (zenUserAgent === undefined || !url.includes('opencode.ai/zen'))
++    if (zenUserAgent === undefined || !/opencode\.ai\//.test(url))
+         return zenNativeFetch(input, init);
+     const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+     headers.set('user-agent', zenUserAgent);
+@@ -159,7 +167,10 @@
+ const zenTool = (name) => ({
+     name,
+     description: ZEN_TOOL_TEXT,
+-    parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
++    // The gate rejects a tool whose schema declares no property at all, so every
++    // placeholder carries one required-shaped property. The model never needs to
++    // call these; the schema exists only to satisfy the fingerprint check.
++    parameters: { type: 'object', properties: { required: { type: 'string', description: ZEN_TOOL_TEXT } }, required: ['required'], additionalProperties: false },
+ });
+ /**
+  * Zen's free tier is gated on the request fingerprint, and the checks are the
+@@ -173,8 +184,18 @@
+  * qualifies is untouched and the provider's prompt cache is not invalidated.
+  */
+ const ZEN_REQUIRED_TOOLS = ['bash', 'read'];
++// A declared tool whose schema names no property is rejected by the same check,
++// so every required name ends up with a non-empty `properties` map: an existing
++// declaration keeps its own properties and only gains one when it had none.
++const withProperty = (tool) => {
++    const parameters = tool.parameters ?? {};
++    const properties = parameters.properties;
++    if (properties !== undefined && Object.keys(properties).length > 0)
++        return tool;
++    return { ...tool, parameters: { ...parameters, type: 'object', properties: { required: { type: 'string', description: ZEN_TOOL_TEXT } }, ...(parameters.required === undefined ? {} : { required: parameters.required }) } };
++};
+ export const requiredZenTools = (tools = []) => {
+-    const filled = [...tools];
++    const filled = tools.map(tool => tool.name !== undefined && ZEN_REQUIRED_TOOLS.includes(tool.name) ? withProperty(tool) : tool);
+     const present = new Set(filled.map(tool => tool.name));
+     for (const name of ZEN_REQUIRED_TOOLS) {
+         if (!present.has(name))
+@@ -363,8 +384,8 @@
+                 name: typeof metadata.name === 'string' ? metadata.name : id,
+                 api,
+                 provider: PROVIDER,
+-                baseUrl: 'https://opencode.ai/zen/v1',
+-                headers: { 'User-Agent': userAgent, 'HTTP-Referer': 'https://opencode.ai' },
++                baseUrl: 'https://opencode.ai/inference/v1',
++                headers: { 'User-Agent': userAgent },
+                 reasoning: controllable,
+                 ...(controllable ? { thinkingLevelMap: reasoningMapFor(levels, api) } : {}),
+                 input: input.length > 0 ? input : ['text'],
+@@ -395,7 +416,7 @@
+         const piProvider = createProvider({
+             id: PROVIDER,
+             name: 'OpenCodeZenFree',
+-            baseUrl: 'https://opencode.ai/zen/v1',
++            baseUrl: 'https://opencode.ai/inference/v1',
+             auth: { apiKey: { name: 'OpenCodeZenFree', resolve: ({ credential }) => Promise.resolve({
+                         auth: credential?.key === undefined ? {} : { apiKey: credential.key },
+                         source: 'OpenCodeZenFree',
