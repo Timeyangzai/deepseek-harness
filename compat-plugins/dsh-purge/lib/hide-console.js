@@ -1,11 +1,11 @@
-import { createRequire, registerHooks } from "node:module";
-import { pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { isAsarSealedPath } from "./desktop.js";
+import { diskFs, fsFor } from "./extract-asar.js";
 
 const MARK = "__dshPurgeHideConsole";
 const IMPORT_MARK = "dsh-purge-hide-console";
-const HOOK_MARK = "__dshPurgeChildProcessHook";
 
 function forceHideOptions(options) {
   if (options == null) return { windowsHide: true };
@@ -56,39 +56,53 @@ function wrapFork(orig) {
   };
 }
 
-function facadeUrl() {
-  return pathToFileURL(fileURLToPath(new URL("./child-process-hide.mjs", import.meta.url))).href;
+export function isElectronHost(versions = process.versions) {
+  return Boolean(versions && versions.electron);
+}
+
+/**
+ * Windows 非 Electron：包 builtin，给子进程加 windowsHide。
+ * Electron（官方桌面 / 第三方 DSH Desktop）整段跳过。
+ * macOS、Linux、Kali 不是 win32，调用方直接跳过。
+ * 不再 registerHooks 短路 node:child_process（#46）。
+ */
+export function hideConsoleDecision(platform = process.platform, versions = process.versions) {
+  if (platform !== "win32") return "not_win32";
+  if (isElectronHost(versions)) return "electron_host";
+  return "wrap_builtin";
 }
 
 export function installChildProcessImportHook() {
-  if (process.platform !== "win32") return { ok: true, skipped: "not_win32" };
-  // Electron 会给 child_process 赋值；ESM namespace 冻结后会抛错，桌面宿主只做 wrap。
-  if (typeof process.versions !== "undefined" && process.versions.electron) {
-    return { ok: true, skipped: "electron_host" };
+  // #46：Node 24 把 node:child_process 短路到 facade 后，
+  // CJS require 会在 loadBuiltinWithHooks 里读到 undefined.exports。
+  // Windows / macOS / Linux 都不再注册这个 resolve 钩子。
+  return { ok: true, skipped: "no_builtin_short_circuit" };
+}
+
+function builtinChildProcess() {
+  try {
+    if (typeof process.getBuiltinModule === "function") {
+      const cp = process.getBuiltinModule("child_process");
+      if (cp && typeof cp.spawn === "function") return cp;
+    }
+  } catch {
+    /* Electron 沙箱里 getBuiltinModule 可能抛，下面再试 require */
   }
-  if (globalThis[HOOK_MARK]) return { ok: true, already: true };
-  const target = facadeUrl();
-  registerHooks({
-    resolve(specifier, context, nextResolve) {
-      if (specifier === "node:child_process" || specifier === "child_process") {
-        return { shortCircuit: true, url: target, format: "module" };
-      }
-      return nextResolve(specifier, context);
-    },
-  });
-  Object.defineProperty(globalThis, HOOK_MARK, { value: true, enumerable: false });
-  return { ok: true, hooked: true };
+  try {
+    const cp = createRequire(import.meta.url)("node:child_process");
+    if (cp && typeof cp.spawn === "function") return cp;
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 export function installHideConsole() {
-  if (process.platform !== "win32") return { ok: true, skipped: "not_win32" };
+  const decision = hideConsoleDecision();
+  if (decision !== "wrap_builtin") return { ok: true, skipped: decision };
   const hook = installChildProcessImportHook();
-  const require = createRequire(import.meta.url);
-  // 改 builtin 本体，和 facade 包的是同一对象。
-  const cp =
-    typeof process.getBuiltinModule === "function"
-      ? process.getBuiltinModule("child_process")
-      : require("node:child_process");
+  const cp = builtinChildProcess();
+  if (!cp) return { ok: true, skipped: "builtin_unavailable", hook };
   if (cp[MARK]) return { ok: true, already: true, hook };
 
   cp.spawn = wrapSpawn(cp.spawn);
@@ -105,31 +119,13 @@ export function installHideConsole() {
 
 export function hideConsoleEntrySource() {
   return `// ${IMPORT_MARK} — auto-installed by dsh-purge; do not edit
-import { pathToFileURL } from "node:url";
-import { fileURLToPath } from "node:url";
-
-const HOOK_MARK = "__dshPurgeChildProcessHook";
 const MARK = ${JSON.stringify(MARK)};
-const facade = pathToFileURL(fileURLToPath(new URL("./dsh-purge-child-process-hide.mjs", import.meta.url))).href;
 
 const isElectron = typeof process.versions !== "undefined" && !!process.versions.electron;
-
-// Electron 宿主不改 resolve；只 wrap builtin。
-if (process.platform === "win32" && !isElectron && !globalThis[HOOK_MARK]) {
-  const { registerHooks } = await import("node:module");
-  registerHooks({
-    resolve(specifier, context, nextResolve) {
-      if (specifier === "node:child_process" || specifier === "child_process") {
-        return { shortCircuit: true, url: facade, format: "module" };
-      }
-      return nextResolve(specifier, context);
-    },
-  });
-  Object.defineProperty(globalThis, HOOK_MARK, { value: true, enumerable: false });
-}
-
-const cp = process.getBuiltinModule ? process.getBuiltinModule("child_process") : null;
-if (process.platform === "win32" && cp && !cp[MARK]) {
+const cp = !isElectron && process.platform === "win32" && typeof process.getBuiltinModule === "function"
+  ? process.getBuiltinModule("child_process")
+  : null;
+if (cp && typeof cp.spawn === "function" && !cp[MARK]) {
   const hide = (options) => {
     if (options == null) return { windowsHide: true };
     if (typeof options !== "object") return options;
@@ -166,15 +162,35 @@ if (process.platform === "win32" && cp && !cp[MARK]) {
 `;
 }
 
-function requireFs() {
-  return createRequire(import.meta.url)("node:fs");
-}
 function requirePath() {
   return createRequire(import.meta.url)("node:path");
 }
 
+function ioFor(explicit, targetPath) {
+  return explicit ?? fsFor(targetPath);
+}
+
+/** 源码 monorepo 的 apps/cli（tsdown 构建产物）。往这里注入/还原会动构建输出，缺 bak 时无法自愈（#41）。 */
+export function looksLikeSourceCliRoot(root, { fs, path: nodePath } = {}) {
+  const p = nodePath ?? requirePath();
+  if (!root) return false;
+  const n = String(root).replace(/\\/g, "/").toLowerCase();
+  if (/\/apps\/cli\/?$/.test(n)) return true;
+  if (/\/node_modules\//.test(n)) return false;
+  try {
+    const nodeFs = ioFor(fs, root);
+    const libDir = p.join(root, "lib");
+    if (nodeFs.existsSync(p.join(libDir, "tsconfig.tsbuildinfo"))) return true;
+    if (nodeFs.existsSync(p.join(root, "tsdown.config.ts")) || nodeFs.existsSync(p.join(root, "tsdown.config.mjs"))) {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
 export function resolveDshBinRoot(hint, { fs, path: nodePath } = {}) {
-  const nodeFs = fs ?? requireFs();
   const p = nodePath ?? requirePath();
   const tries = [];
   const push = (x) => {
@@ -196,7 +212,19 @@ export function resolveDshBinRoot(hint, { fs, path: nodePath } = {}) {
   }
   for (const root of tries) {
     try {
-      if (nodeFs.existsSync(p.join(root, "lib", "bin.js"))) return p.normalize(root);
+      const binJs = p.join(root, "lib", "bin.js");
+      if (isAsarSealedPath(root) || isAsarSealedPath(binJs)) continue;
+      // 源码树只作探测候选的最后手段；优先 node_modules 包，避免改写 apps/cli/lib（#41）。
+      if (looksLikeSourceCliRoot(root, { fs, path: p })) continue;
+      if (ioFor(fs, binJs).existsSync(binJs)) return p.normalize(root);
+    } catch {}
+  }
+  // 没有包装配路径时，才回退到 argv 指向的源码 cli（仍禁止注入，见 installHideConsoleIntoBin）。
+  for (const root of tries) {
+    try {
+      const binJs = p.join(root, "lib", "bin.js");
+      if (isAsarSealedPath(root) || isAsarSealedPath(binJs)) continue;
+      if (ioFor(fs, binJs).existsSync(binJs)) return p.normalize(root);
     } catch {}
   }
   return null;
@@ -206,15 +234,18 @@ const IMPORT_LINE = `import "./${IMPORT_MARK}.js"; // [dsh-purge] hide-console`;
 
 export function installHideConsoleIntoBin(aiBase, { fs, path: nodePath } = {}) {
   if (process.platform !== "win32") return "skipped_not_win32";
-  const nodeFs = fs ?? requireFs();
   const p = nodePath ?? requirePath();
-  const root = resolveDshBinRoot(aiBase, { fs: nodeFs, path: p });
+  const root = resolveDshBinRoot(aiBase, { fs, path: p });
   if (!root) return "missing_bin";
+  // 源码部署的 apps/cli/lib 是 tsdown 产物：只准读、不准写 sidecar / 改 bin.js（#41）。
+  if (looksLikeSourceCliRoot(root, { fs, path: p })) return "skipped_source_cli";
+  const nodeFs = ioFor(fs, root);
   const binJs = p.join(root, "lib", "bin.js");
   const side = p.join(root, "lib", `${IMPORT_MARK}.js`);
   const facadeSide = p.join(root, "lib", "dsh-purge-child-process-hide.mjs");
+  if (isAsarSealedPath(root) || isAsarSealedPath(binJs)) return "sealed_asar";
 
-  const facadeSrc = nodeFs.readFileSync(
+  const facadeSrc = diskFs().readFileSync(
     fileURLToPath(new URL("./child-process-hide.mjs", import.meta.url)),
     "utf8",
   );
@@ -240,15 +271,17 @@ export function installHideConsoleIntoBin(aiBase, { fs, path: nodePath } = {}) {
 }
 
 export function revertHideConsoleFromBin(aiBase, { fs, path: nodePath } = {}) {
-  const nodeFs = fs ?? requireFs();
   const p = nodePath ?? requirePath();
-  const root = resolveDshBinRoot(aiBase, { fs: nodeFs, path: p });
+  const root = resolveDshBinRoot(aiBase, { fs, path: p });
   if (!root) return "missing_bin";
+  // 源码 cli：只清理本插件留下的 sidecar，绝不改/删 bin.js 或其它构建产物（#41）。
+  const sourceCli = looksLikeSourceCliRoot(root, { fs, path: p });
+  const nodeFs = ioFor(fs, root);
   const binJs = p.join(root, "lib", "bin.js");
   const side = p.join(root, "lib", `${IMPORT_MARK}.js`);
   const facadeSide = p.join(root, "lib", "dsh-purge-child-process-hide.mjs");
   let changed = false;
-  if (nodeFs.existsSync(binJs)) {
+  if (!sourceCli && nodeFs.existsSync(binJs)) {
     try {
       const text = nodeFs.readFileSync(binJs, "utf8");
       const next = text.replace(/^import "\.\/dsh-purge-hide-console\.js";.*\r?\n/gm, "");

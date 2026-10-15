@@ -7,7 +7,7 @@ window.__ModuleLoader__.load({
 		let react = require("react");
 		let react_jsx_runtime = require("react/jsx-runtime");
 		//#region \0dsh-css:packages/dsh-liangshen/src/client/LiangShenLever.module.css.mjs
-		const css$1 = ".hYkIZq_lever{align-items:center;font-size:12px;line-height:1;display:inline-flex;position:relative}.hYkIZq_control{color:var(--dsw-alias-label-secondary,inherit);font:inherit;cursor:pointer;touch-action:none;background:0 0;border:none;border-radius:999px;align-items:center;gap:6px;margin:0;padding:2px 8px 2px 4px;transition:background-color .16s,color .16s;display:inline-flex}.hYkIZq_control:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,#0000000f)}.hYkIZq_control:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,currentColor);outline-offset:2px}.hYkIZq_control:disabled{cursor:default;opacity:.55}.hYkIZq_track{background:linear-gradient(#2b2f36,#14161a);border-radius:8px;justify-content:center;align-items:flex-end;width:24px;height:28px;display:inline-flex;position:relative;overflow:hidden;box-shadow:inset 0 0 0 1px #ffffff24,inset 0 6px 10px #0000008c}.hYkIZq_track:after{content:\"\";background:#ffffff38;border-radius:2px;height:3px;position:absolute;bottom:2px;left:3px;right:3px}.hYkIZq_arm{transform-origin:50% 24px;width:16px;height:26px;margin-left:-8px;transition:transform .34s cubic-bezier(.2,1.7,.32,1);position:absolute;bottom:2px;left:50%;transform:rotate(-24deg)}.hYkIZq_lever[data-state=on] .hYkIZq_arm{transform:rotate(24deg)}.hYkIZq_rod{fill:#c9ced6;transition:fill .2s}.hYkIZq_knob{fill:#e04a33;stroke:#00000059;stroke-width:.6px;transition:fill .2s}.hYkIZq_lever[data-state=on] .hYkIZq_rod{fill:#ffd76a}.hYkIZq_lever[data-state=on] .hYkIZq_knob{fill:#f7c637}.hYkIZq_lever[data-state=on] .hYkIZq_track{box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l3,#0000001f), 0 0 10px #f7c6378c}.hYkIZq_lever[data-busy=true] .hYkIZq_arm{animation:.42s ease-in-out infinite hYkIZq_lever-jitter}.hYkIZq_readout{white-space:nowrap;letter-spacing:.02em;min-width:4.4em}.hYkIZq_lever[data-state=on] .hYkIZq_readout{color:var(--dsw-alias-label-primary,inherit);font-weight:600}.hYkIZq_error{background:var(--dsw-alias-bg-layer-3,#0000000f);max-width:22ch;color:var(--dsw-alias-state-error-primary,#c0392b);text-overflow:ellipsis;white-space:nowrap;border-radius:6px;margin-left:4px;padding:2px 6px;overflow:hidden}.hYkIZq_burst{z-index:60;pointer-events:none;place-items:center;display:grid;position:fixed;inset:0;overflow:hidden}.hYkIZq_flash{background:radial-gradient(circle at 50% 62%,#fff6c8eb,#ffd04a73 38%,#ffa00000 72%);animation:.72s ease-out both hYkIZq_burst-flash;position:absolute;inset:0}.hYkIZq_ring{border:6px solid #ffd65ad9;border-radius:50%;width:220px;height:220px;animation:1.1s cubic-bezier(.16,.9,.3,1) both hYkIZq_burst-ring;position:absolute}.hYkIZq_ring:nth-of-type(2){animation-delay:.12s}.hYkIZq_ring:nth-of-type(3){animation-delay:.24s}.hYkIZq_banner{color:#ffe9a8;text-align:center;background:linear-gradient(160deg,#181004f0,#402604eb);border-radius:22px;flex-direction:column;align-items:center;gap:6px;padding:22px 40px;animation:.6s cubic-bezier(.16,1.5,.3,1) both hYkIZq_banner-slam,.5s ease-in-out .6s 2 hYkIZq_banner-shake;display:flex;position:relative;box-shadow:0 0 0 2px #ffd65abf,0 24px 70px #00000073}.hYkIZq_bannerName{letter-spacing:.16em;background:linear-gradient(#fff6d0,#ffc93c 55%,#b8730a);color:#0000;text-shadow:0 0 24px #ffc93ca6;-webkit-background-clip:text;background-clip:text;font-size:44px;font-weight:800}.hYkIZq_line{letter-spacing:.08em;font-size:15px}.hYkIZq_code{font-family:var(--dsw-font-mono,ui-monospace, SFMono-Regular, Menlo, monospace);letter-spacing:.06em;opacity:.82;font-size:11px;animation:.5s steps(2,end) 6 hYkIZq_code-blink}.hYkIZq_sparks{place-items:center;display:grid;position:absolute;inset:0}.hYkIZq_spark{transform-origin:50%;background:linear-gradient(#ffeca0f2,#ffaa1400);border-radius:3px;grid-area:1/1;width:3px;height:30px;animation:.95s ease-out both hYkIZq_spark-fly}@keyframes hYkIZq_lever-jitter{0%,to{transform:rotate(-22deg)}50%{transform:rotate(-8deg)}}@keyframes hYkIZq_burst-flash{0%{opacity:0;transform:scale(.6)}18%{opacity:1}to{opacity:0;transform:scale(1.5)}}@keyframes hYkIZq_burst-ring{0%{opacity:.9;transform:scale(.2)}to{opacity:0;transform:scale(3.4)}}@keyframes hYkIZq_banner-slam{0%{opacity:0;transform:scale(3.6)rotate(-9deg)}55%{opacity:1;transform:scale(.94)rotate(1.5deg)}75%{transform:scale(1.06)rotate(-1deg)}to{opacity:1;transform:scale(1)rotate(0)}}@keyframes hYkIZq_banner-shake{0%,to{transform:translate(0)}25%{transform:translate(-9px)rotate(-.6deg)}75%{transform:translate(9px)rotate(.6deg)}}@keyframes hYkIZq_spark-fly{0%{opacity:0;transform:translateY(-40px)scaleY(.3)}18%{opacity:1}to{opacity:0;transform:translateY(-300px)scaleY(1.15)}}@keyframes hYkIZq_code-blink{0%,to{opacity:.35}50%{opacity:1}}@media (prefers-reduced-motion:reduce){.hYkIZq_arm,.hYkIZq_control,.hYkIZq_rod,.hYkIZq_knob{transition:none}.hYkIZq_lever[data-busy=true] .hYkIZq_arm,.hYkIZq_flash,.hYkIZq_ring,.hYkIZq_banner,.hYkIZq_code,.hYkIZq_spark{animation:none}.hYkIZq_burst{animation:.3s ease-out both hYkIZq_burst-flash}.hYkIZq_spark{display:none}}";
+		const css$1 = ".hYkIZq_lever{align-items:center;font-size:12px;line-height:1;display:inline-flex;position:relative}.hYkIZq_control{color:var(--dsw-alias-label-secondary,inherit);font:inherit;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;background:0 0;border:none;border-radius:999px;align-items:center;gap:6px;margin:0;padding:2px 8px 2px 4px;transition:background-color .16s,color .16s;display:inline-flex}.hYkIZq_control:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,#0000000f)}.hYkIZq_control:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,currentColor);outline-offset:2px}.hYkIZq_control:disabled{cursor:default;opacity:.55}.hYkIZq_track{background:linear-gradient(#2b2f36,#14161a);border-radius:8px;justify-content:center;align-items:flex-end;width:24px;height:28px;display:inline-flex;position:relative;overflow:hidden;box-shadow:inset 0 0 0 1px #ffffff24,inset 0 6px 10px #0000008c}.hYkIZq_track:after{content:\"\";background:#ffffff38;border-radius:2px;height:3px;position:absolute;bottom:2px;left:3px;right:3px}.hYkIZq_arm{transform-origin:50% 24px;width:16px;height:26px;margin-left:-8px;transition:transform .34s cubic-bezier(.2,1.7,.32,1);position:absolute;bottom:2px;left:50%;transform:rotate(-24deg)}.hYkIZq_lever[data-state=on] .hYkIZq_arm{transform:rotate(24deg)}.hYkIZq_rod{fill:#c9ced6;transition:fill .2s}.hYkIZq_knob{fill:#e04a33;stroke:#00000059;stroke-width:.6px;transition:fill .2s}.hYkIZq_lever[data-state=on] .hYkIZq_rod{fill:#ffd76a}.hYkIZq_lever[data-state=on] .hYkIZq_knob{fill:#f7c637}.hYkIZq_lever[data-state=on] .hYkIZq_track{box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l3,#0000001f), 0 0 10px #f7c6378c}.hYkIZq_lever[data-busy=true] .hYkIZq_arm{animation:.42s ease-in-out infinite hYkIZq_lever-jitter}.hYkIZq_readout{white-space:nowrap;letter-spacing:.02em;min-width:4.4em}.hYkIZq_lever[data-state=on] .hYkIZq_readout{color:var(--dsw-alias-label-primary,inherit);font-weight:600}.hYkIZq_error{background:var(--dsw-alias-bg-layer-3,#0000000f);max-width:22ch;color:var(--dsw-alias-state-error-primary,#c0392b);text-overflow:ellipsis;white-space:nowrap;border-radius:6px;margin-left:4px;padding:2px 6px;overflow:hidden}.hYkIZq_burst{z-index:60;pointer-events:none;place-items:center;display:grid;position:fixed;inset:0;overflow:hidden}.hYkIZq_flash{background:radial-gradient(circle at 50% 62%,#fff6c8eb,#ffd04a73 38%,#ffa00000 72%);animation:.72s ease-out both hYkIZq_burst-flash;position:absolute;inset:0}.hYkIZq_ring{border:6px solid #ffd65ad9;border-radius:50%;width:220px;height:220px;animation:1.1s cubic-bezier(.16,.9,.3,1) both hYkIZq_burst-ring;position:absolute}.hYkIZq_ring:nth-of-type(2){animation-delay:.12s}.hYkIZq_ring:nth-of-type(3){animation-delay:.24s}.hYkIZq_banner{color:#ffe9a8;text-align:center;background:linear-gradient(160deg,#181004f0,#402604eb);border-radius:22px;flex-direction:column;align-items:center;gap:6px;padding:22px 40px;animation:.6s cubic-bezier(.16,1.5,.3,1) both hYkIZq_banner-slam,.5s ease-in-out .6s 2 hYkIZq_banner-shake;display:flex;position:relative;box-shadow:0 0 0 2px #ffd65abf,0 24px 70px #00000073}.hYkIZq_bannerName{letter-spacing:.16em;background:linear-gradient(#fff6d0,#ffc93c 55%,#b8730a);color:#0000;text-shadow:0 0 24px #ffc93ca6;-webkit-background-clip:text;background-clip:text;font-size:44px;font-weight:800}.hYkIZq_line{letter-spacing:.08em;font-size:15px}.hYkIZq_code{font-family:var(--dsw-font-mono,ui-monospace, SFMono-Regular, Menlo, monospace);letter-spacing:.06em;opacity:.82;font-size:11px;animation:.5s steps(2,end) 6 hYkIZq_code-blink}.hYkIZq_sparks{place-items:center;display:grid;position:absolute;inset:0}.hYkIZq_spark{transform-origin:50%;background:linear-gradient(#ffeca0f2,#ffaa1400);border-radius:3px;grid-area:1/1;width:3px;height:30px;animation:.95s ease-out both hYkIZq_spark-fly}@keyframes hYkIZq_lever-jitter{0%,to{transform:rotate(-22deg)}50%{transform:rotate(-8deg)}}@keyframes hYkIZq_burst-flash{0%{opacity:0;transform:scale(.6)}18%{opacity:1}to{opacity:0;transform:scale(1.5)}}@keyframes hYkIZq_burst-ring{0%{opacity:.9;transform:scale(.2)}to{opacity:0;transform:scale(3.4)}}@keyframes hYkIZq_banner-slam{0%{opacity:0;transform:scale(3.6)rotate(-9deg)}55%{opacity:1;transform:scale(.94)rotate(1.5deg)}75%{transform:scale(1.06)rotate(-1deg)}to{opacity:1;transform:scale(1)rotate(0)}}@keyframes hYkIZq_banner-shake{0%,to{transform:translate(0)}25%{transform:translate(-9px)rotate(-.6deg)}75%{transform:translate(9px)rotate(.6deg)}}@keyframes hYkIZq_spark-fly{0%{opacity:0;transform:translateY(-40px)scaleY(.3)}18%{opacity:1}to{opacity:0;transform:translateY(-300px)scaleY(1.15)}}@keyframes hYkIZq_code-blink{0%,to{opacity:.35}50%{opacity:1}}@media (prefers-reduced-motion:reduce){.hYkIZq_arm,.hYkIZq_control,.hYkIZq_rod,.hYkIZq_knob{transition:none}.hYkIZq_lever[data-busy=true] .hYkIZq_arm,.hYkIZq_flash,.hYkIZq_ring,.hYkIZq_banner,.hYkIZq_code,.hYkIZq_spark{animation:none}.hYkIZq_burst{animation:.3s ease-out both hYkIZq_burst-flash}.hYkIZq_spark{display:none}}";
 		const tagId$1 = "@linxin666/dsh-liangshen/packages/dsh-liangshen/src/client/LiangShenLever.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
 			const tag = document.createElement("style");
@@ -66,6 +66,14 @@ window.__ModuleLoader__.load({
 		const MORSE = "-.. . . .--. ... . . -.- / .... .- .-. -. . ... ...";
 		/** One spark per spoke of the burst. */
 		const SPARKS = Array.from({ length: 14 }, (_, index) => index);
+		/** Sync the hero preset chip above the composer so both controls always agree. */
+		function syncHeroChip(label) {
+			try {
+				if (typeof document === "undefined") return;
+				const chip = document.querySelector("button[aria-haspopup=\"menu\"] span[class*=\"seatLabel\"]") ?? Array.from(document.querySelectorAll("button[aria-haspopup=\"menu\"] span")).find((s) => s.className.includes("seatLabel"));
+				if (chip && chip.textContent !== label) chip.textContent = label;
+			} catch {}
+		}
 		/** Slot entry for `conversation.input.right` (left of the model selector). */
 		function LiangShenLever(face) {
 			const { state, restoreLabel, busy, error, burst } = (0, react.useSyncExternalStore)(face.store.subscribe, face.store.getSnapshot);
@@ -88,6 +96,16 @@ window.__ModuleLoader__.load({
 					clearTimeout(timer);
 				};
 			}, [burstKey]);
+			const prevState = (0, react.useRef)(state);
+			(0, react.useEffect)(() => {
+				if (state === "on") syncHeroChip(face.t("lever.name"));
+				else if (prevState.current === "on" && state === "off" && restoreLabel !== "") syncHeroChip(restoreLabel);
+				prevState.current = state;
+			}, [
+				state,
+				restoreLabel,
+				face
+			]);
 			if (state === "locked" || state === "missing" || state === "on" && restoreLabel === "") return null;
 			const toggle = () => {
 				if (!actionable) return;
@@ -97,21 +115,23 @@ window.__ModuleLoader__.load({
 			const onPointerDown = (event) => {
 				if (!actionable) return;
 				drag.current = {
+					x: event.clientX,
 					y: event.clientY,
 					fired: false
 				};
-				event.currentTarget.setPointerCapture?.(event.pointerId);
+				try {
+					event.currentTarget.setPointerCapture?.(event.pointerId);
+				} catch {}
 			};
 			const onPointerMove = (event) => {
 				const pending = drag.current;
 				if (pending === void 0 || pending.fired) return;
-				const travel = event.clientY - pending.y;
-				if (travel >= DRAG_THRESHOLD_PX) {
+				const travelY = event.clientY - pending.y;
+				const travelX = event.clientX - pending.x;
+				if (Math.hypot(travelX, travelY) >= DRAG_THRESHOLD_PX) {
 					pending.fired = true;
-					face.pull();
-				} else if (travel <= -14) {
-					pending.fired = true;
-					face.push();
+					if (on) face.push();
+					else face.pull();
 				}
 			};
 			const onPointerUp = () => {
@@ -236,6 +256,21 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
+		//#region src/client/main-session.ts
+		/**
+		* Resolve the Session the main view currently shows.
+		*
+		* Reads the catalog's rows rather than a per-id retain-info source: ownership
+		* counts ride the list snapshot, so this neither allocates observers nor opens
+		* history, and a subscription to the list still fires when the selection moves.
+		* @param byId - the session catalog's rows (`SessionListState.byId`), when available.
+		* @returns the main-view session id, or undefined when the main view shows none.
+		*/
+		function mainViewSessionId(byId) {
+			if (byId === void 0 || byId === null) return void 0;
+			for (const row of Object.values(byId)) if (row !== void 0 && (row.retainedBy?.mainView ?? 0) > 0) return row.id;
+		}
+		//#endregion
 		//#region \0dsh-store-engine
 		const platform = ["@deepseek-ai/dsh-client", "-store"].join("");
 		const legacy = ["@deepseek-ai/dsh-client-runtime", "/client"].join("");
@@ -292,6 +327,18 @@ window.__ModuleLoader__.load({
 		function isActionable(state) {
 			return state === "on" || state === "off";
 		}
+		/**
+		* Settings entry ids whose writes can move the roster this lever reads: the
+		* agent-preset registry's own entry (its default and selection policy) and this
+		* plugin's row under either install shape — the aggregate's generated row id
+		* and the standalone row id — because disabling the plugin unregisters the
+		* preset it declares.
+		*/
+		const ROSTER_SETTINGS_ENTRY_IDS = [
+			"agent-preset-registry",
+			"web-ui-liangshen",
+			"liangshen"
+		];
 		/** Read the preset a session summary reports, when it reports one. */
 		function presetOf(session) {
 			const value = session?.projectionValues?.["agentPreset"];
@@ -341,7 +388,7 @@ window.__ModuleLoader__.load({
 				}));
 				const remote = readService(() => this.ctx.remote);
 				if (typeof remote?.$on === "function") this.disposers.push(remote.$on("settings/document-updated", (ns) => {
-					if (ns === "agent-presets") this.load();
+					if (ROSTER_SETTINGS_ENTRY_IDS.includes(ns)) this.load();
 				}));
 				this.refresh();
 				if (this.remote !== void 0) this.load();
@@ -443,7 +490,10 @@ window.__ModuleLoader__.load({
 					this.refresh();
 					return;
 				}
-				this.previous = direction === "down" ? facts.agentPreset : void 0;
+				if (direction === "down") {
+					const prev = facts.agentPreset ?? this.detectPreset();
+					if (prev !== void 0 && prev !== "liangshen") this.rememberPrevious(prev);
+				}
 				const next = this.store.getSnapshot();
 				this.store.set({
 					...next,
@@ -453,26 +503,56 @@ window.__ModuleLoader__.load({
 				});
 				this.refresh();
 			}
+			/**
+			* Try to detect the active preset from the DOM hero chip or storage
+			* when session.projectionValues.agentPreset is absent.
+			*/
+			detectPreset() {
+				try {
+					if (typeof document !== "undefined") {
+						const text = (document.querySelector("button[aria-haspopup=\"menu\"] span[class*=\"seatLabel\"]") ?? Array.from(document.querySelectorAll("button[aria-haspopup=\"menu\"] span")).find((s) => s.className.includes("seatLabel")))?.textContent?.trim();
+						if (text) {
+							const matched = this.rows.find((row) => (row.name === text || row.id === text) && row.id !== "liangshen");
+							if (matched) return matched.id;
+						}
+					}
+				} catch {}
+				try {
+					if (typeof sessionStorage !== "undefined") {
+						const stored = sessionStorage.getItem("dsh-liangshen:previous-preset");
+						if (stored && stored !== "liangshen" && this.rows.some((r) => r.id === stored)) return stored;
+					}
+				} catch {}
+			}
+			rememberPrevious(presetId) {
+				if (presetId === void 0 || presetId === "liangshen") return;
+				this.previous = presetId;
+				try {
+					if (typeof sessionStorage !== "undefined") sessionStorage.setItem("dsh-liangshen:previous-preset", presetId);
+				} catch {}
+			}
 			/** The facts one decision reads, from the live session and the roster. */
 			facts() {
 				const summary = this.currentSession();
 				const available = this.rows.filter((row) => row.broken === void 0).map((row) => row.id);
 				const fallback = this.rows.find((row) => row.isDefault)?.id;
+				const currentPreset = presetOf(summary);
+				if (currentPreset !== void 0 && currentPreset !== "liangshen") this.rememberPrevious(currentPreset);
+				const previous = this.previous ?? this.detectPreset();
 				return {
 					blank: summary?.blank === true,
-					agentPreset: presetOf(summary),
+					agentPreset: currentPreset,
 					available,
 					fallback,
-					previous: this.previous
+					previous
 				};
 			}
 			currentSessionId() {
-				const current = this.sessions?.list.getSnapshot().current;
-				return current === void 0 ? void 0 : String(current);
+				return mainViewSessionId(this.sessions?.list.getSnapshot().byId);
 			}
 			currentSession() {
 				const state = this.sessions?.list.getSnapshot();
-				const current = state?.current;
+				const current = mainViewSessionId(state?.byId);
 				if (state === void 0 || current === void 0) return void 0;
 				return state.byId[current];
 			}
@@ -532,8 +612,46 @@ window.__ModuleLoader__.load({
 			return error instanceof Error ? error.message : String(error);
 		}
 		//#endregion
+		//#region src/client/LiangShenMark.tsx
+		/**
+		* Render the LiangShen card mark.
+		* @returns the 18x18 lever mark, in the current text color.
+		*/
+		function LiangShenMark() {
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
+				width: "18",
+				height: "18",
+				viewBox: "0 0 18 18",
+				fill: "none",
+				"aria-hidden": "true",
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
+					x: "3.6",
+					y: "13.2",
+					width: "8.8",
+					height: "2.8",
+					rx: "1.4",
+					fill: "currentColor"
+				}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", {
+					transform: "rotate(20 8 14.4)",
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
+						x: "6.5",
+						y: "4.6",
+						width: "3",
+						height: "9.8",
+						rx: "1.5",
+						fill: "currentColor"
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("circle", {
+						cx: "8",
+						cy: "4.4",
+						r: "2.9",
+						fill: "currentColor"
+					})]
+				})]
+			});
+		}
+		//#endregion
 		//#region \0dsh-css:packages/dsh-liangshen/src/client/settings-card.module.css.mjs
-		const css = "._9t79wq_card{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:12px;list-style:none;transition:border-color .16s,background .16s}._9t79wq_card:hover{border-color:var(--dsw-alias-label-dimmed)}._9t79wq_cardOpen{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-label-dimmed)}._9t79wq_header{appearance:none;box-sizing:border-box;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;background:0 0;border:0;border-radius:12px;align-items:center;gap:12px;padding:14px 16px;display:flex}._9t79wq_header:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}._9t79wq_headerStatic{box-sizing:border-box;border-radius:12px;align-items:center;gap:12px;width:100%;padding:14px 16px;display:flex}._9t79wq_headText{flex-direction:column;flex:1;gap:4px;min-width:0;display:flex}._9t79wq_name{color:var(--dsw-alias-label-primary);font-size:15px;font-weight:600;line-height:1.4}._9t79wq_description{color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}._9t79wq_pending{white-space:nowrap;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary);border-radius:999px;flex:none;padding:1px 8px;font-size:11px;font-weight:500;line-height:17px}._9t79wq_chevron{color:var(--dsw-alias-label-tertiary);flex:none;transition:transform .16s}._9t79wq_chevronOpen{transform:rotate(180deg)}._9t79wq_body{border-top:1px solid var(--dsw-alias-border-l2);margin:0 16px;padding-bottom:8px}._9t79wq_readOnly{color:var(--dsw-alias-label-secondary);margin:12px 0 0;font-size:12px;line-height:1.5}._9t79wq_notExposed{color:var(--dsw-alias-state-warn-primary);margin:12px 0 0;font-size:12px;line-height:1.5}._9t79wq_footer{border-top:1px solid var(--dsw-alias-border-l2);justify-content:flex-end;align-items:center;gap:8px;padding:12px 0 4px;display:flex}._9t79wq_failed{min-width:0;color:var(--dsw-alias-state-error-primary,#b42318);text-overflow:ellipsis;white-space:nowrap;flex:1;margin:0;font-size:12px;line-height:1.5;overflow:hidden}._9t79wq_discard,._9t79wq_save{appearance:none;font:inherit;cursor:pointer;border:1px solid #0000;border-radius:8px;padding:5px 14px;font-size:13px;line-height:1.5}._9t79wq_discard{border-color:var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);background:0 0}._9t79wq_discard:hover:not(:disabled){color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-label-dimmed)}._9t79wq_save{background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-layer-3)}._9t79wq_discard:disabled,._9t79wq_save:disabled{opacity:.4;cursor:default}._9t79wq_discard:focus-visible,._9t79wq_save:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}._9t79wq_field{flex-direction:column;gap:6px;padding:12px 0;display:flex}._9t79wq_field+._9t79wq_field{border-top:1px solid var(--dsw-alias-border-l2)}._9t79wq_head{align-items:center;gap:8px;display:flex}._9t79wq_label{min-width:0;color:var(--dsw-alias-label-primary);flex:1;font-size:13px;font-weight:500;line-height:1.5}._9t79wq_badges{align-items:center;gap:8px;display:inline-flex}._9t79wq_badge{white-space:nowrap;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary);border-radius:999px;padding:1px 8px;font-size:11px;font-weight:500;line-height:17px}._9t79wq_reset{font:inherit;color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;padding:0;font-size:12px;line-height:1.5}._9t79wq_reset:hover:not(:disabled){color:var(--dsw-alias-label-primary)}._9t79wq_reset:disabled{cursor:default}._9t79wq_reset:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}._9t79wq_input,._9t79wq_select{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);height:34px;font:inherit;color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5}._9t79wq_input:focus-visible,._9t79wq_select:focus-visible{border-color:var(--dsw-alias-brand-primary);outline:none}._9t79wq_input:disabled,._9t79wq_select:disabled{color:var(--dsw-alias-label-tertiary);cursor:default}._9t79wq_inputInvalid{border:1px solid var(--dsw-alias-state-error-primary,#b42318);background:var(--dsw-alias-bg-layer-3);height:34px;font:inherit;color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5}._9t79wq_inputInvalid:focus-visible{outline:2px solid var(--dsw-alias-state-error-primary,#b42318);outline-offset:1px;border-color:var(--dsw-alias-state-error-primary,#b42318)}._9t79wq_selectWrap{position:relative}._9t79wq_selectButton{appearance:none;text-align:left;cursor:pointer;justify-content:space-between;align-items:center;gap:8px;width:100%;display:flex}._9t79wq_selectLabel{text-overflow:ellipsis;white-space:nowrap;min-width:0;overflow:hidden}._9t79wq_selectChevron{color:var(--dsw-alias-label-tertiary);flex:none;transition:transform .16s}._9t79wq_selectChevronOpen{transform:rotate(180deg)}._9t79wq_selectPopup{z-index:40;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);max-height:240px;box-shadow:0 8px 24px var(--dsw-alias-bg-mask-2);opacity:0;border-radius:8px;flex-direction:column;padding:4px;transition:opacity .1s,transform .1s;display:flex;position:absolute;top:calc(100% + 4px);left:0;right:0;overflow-y:auto;transform:translateY(-4px)}._9t79wq_selectPopupOpen{opacity:1;transform:none}._9t79wq_selectPopupClose{opacity:0;pointer-events:none;transform:translateY(-4px)}._9t79wq_selectOption{color:var(--dsw-alias-label-primary);cursor:pointer;white-space:nowrap;text-overflow:ellipsis;border-radius:6px;flex-shrink:0;padding:6px 10px;font-size:13px;line-height:1.5;overflow:hidden}._9t79wq_selectOption:hover,._9t79wq_selectOptionActive{background:var(--dsw-alias-interactive-bg-hover)}._9t79wq_selectOptionSelected{color:var(--dsw-alias-brand-primary);background:color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color) 10%, transparent);font-weight:500}._9t79wq_invalid{color:var(--dsw-alias-state-error-primary,#b42318);margin:0;font-size:12px;line-height:1.5}._9t79wq_hint{color:var(--dsw-alias-label-secondary);margin:0;font-size:12px;line-height:1.5}@media (prefers-reduced-motion:reduce){._9t79wq_card,._9t79wq_header,._9t79wq_chevron,._9t79wq_chevronOpen,._9t79wq_discard,._9t79wq_save,._9t79wq_selectChevron,._9t79wq_selectChevronOpen,._9t79wq_selectPopup{transition:none}}";
+		const css = "._9t79wq_card{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:12px;list-style:none;transition:border-color .16s,background .16s}._9t79wq_card:hover{border-color:var(--dsw-alias-label-dimmed)}._9t79wq_cardOpen{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-label-dimmed)}._9t79wq_header{appearance:none;box-sizing:border-box;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;background:0 0;border:0;border-radius:12px;align-items:center;gap:13px;padding:16px;display:flex}._9t79wq_header:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}._9t79wq_headerStatic{box-sizing:border-box;border-radius:12px;align-items:center;gap:13px;width:100%;padding:16px;display:flex}._9t79wq_headText{flex-direction:column;flex:1;gap:4px;min-width:0;display:flex}._9t79wq_mark{background:var(--dsw-alias-bg-module-platform);width:34px;height:34px;color:var(--dsw-alias-label-secondary);border-radius:10px;flex:none;place-items:center;transition:color .16s;display:grid}._9t79wq_header:hover ._9t79wq_mark,._9t79wq_cardOpen ._9t79wq_mark{color:var(--dsw-alias-label-primary)}._9t79wq_name{color:var(--dsw-alias-label-primary);font-size:15px;font-weight:600;line-height:1.4}._9t79wq_description{color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}._9t79wq_pending{white-space:nowrap;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary);border-radius:999px;flex:none;padding:1px 8px;font-size:11px;font-weight:500;line-height:17px}._9t79wq_chevron{color:var(--dsw-alias-label-tertiary);flex:none;width:16px;height:16px;transition:transform .16s,color .16s}._9t79wq_header:hover ._9t79wq_chevron{color:var(--dsw-alias-label-secondary)}._9t79wq_chevronOpen{transform:rotate(180deg)}._9t79wq_body{border-top:1px solid var(--dsw-alias-border-l2);margin:0 16px;padding-bottom:8px}._9t79wq_readOnly{color:var(--dsw-alias-label-secondary);margin:12px 0 0;font-size:12px;line-height:1.5}._9t79wq_notExposed{color:var(--dsw-alias-state-warn-primary);margin:12px 0 0;font-size:12px;line-height:1.5}._9t79wq_footer{border-top:1px solid var(--dsw-alias-border-l2);justify-content:flex-end;align-items:center;gap:8px;padding:12px 0 4px;display:flex}._9t79wq_failed{min-width:0;color:var(--dsw-alias-state-error-primary,#b42318);text-overflow:ellipsis;white-space:nowrap;flex:1;margin:0;font-size:12px;line-height:1.5;overflow:hidden}._9t79wq_discard,._9t79wq_save{appearance:none;font:inherit;cursor:pointer;border:1px solid #0000;border-radius:8px;padding:5px 14px;font-size:13px;line-height:1.5}._9t79wq_discard{border-color:var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);background:0 0}._9t79wq_discard:hover:not(:disabled){color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-label-dimmed)}._9t79wq_save{background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-layer-3)}._9t79wq_discard:disabled,._9t79wq_save:disabled{opacity:.4;cursor:default}._9t79wq_discard:focus-visible,._9t79wq_save:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}._9t79wq_field{flex-direction:column;gap:6px;padding:12px 0;display:flex}._9t79wq_field+._9t79wq_field{border-top:1px solid var(--dsw-alias-border-l2)}._9t79wq_head{align-items:center;gap:8px;display:flex}._9t79wq_label{min-width:0;color:var(--dsw-alias-label-primary);flex:1;font-size:13px;font-weight:500;line-height:1.5}._9t79wq_badges{align-items:center;gap:8px;display:inline-flex}._9t79wq_badge{white-space:nowrap;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary);border-radius:999px;padding:1px 8px;font-size:11px;font-weight:500;line-height:17px}._9t79wq_reset{font:inherit;color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;padding:0;font-size:12px;line-height:1.5}._9t79wq_reset:hover:not(:disabled){color:var(--dsw-alias-label-primary)}._9t79wq_reset:disabled{cursor:default}._9t79wq_reset:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}._9t79wq_input,._9t79wq_select{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);height:34px;font:inherit;color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5}._9t79wq_input:focus-visible,._9t79wq_select:focus-visible{border-color:var(--dsw-alias-brand-primary);outline:none}._9t79wq_input:disabled,._9t79wq_select:disabled{color:var(--dsw-alias-label-tertiary);cursor:default}._9t79wq_inputInvalid{border:1px solid var(--dsw-alias-state-error-primary,#b42318);background:var(--dsw-alias-bg-layer-3);height:34px;font:inherit;color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5}._9t79wq_inputInvalid:focus-visible{outline:2px solid var(--dsw-alias-state-error-primary,#b42318);outline-offset:1px;border-color:var(--dsw-alias-state-error-primary,#b42318)}._9t79wq_selectWrap{position:relative}._9t79wq_selectButton{appearance:none;text-align:left;cursor:pointer;justify-content:space-between;align-items:center;gap:8px;width:100%;display:flex}._9t79wq_selectLabel{text-overflow:ellipsis;white-space:nowrap;min-width:0;overflow:hidden}._9t79wq_selectChevron{color:var(--dsw-alias-label-tertiary);flex:none;transition:transform .16s}._9t79wq_selectChevronOpen{transform:rotate(180deg)}._9t79wq_selectPopup{z-index:40;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);max-height:240px;box-shadow:0 8px 24px var(--dsw-alias-bg-mask-2);opacity:0;border-radius:8px;flex-direction:column;padding:4px;transition:opacity .1s,transform .1s;display:flex;position:absolute;top:calc(100% + 4px);left:0;right:0;overflow-y:auto;transform:translateY(-4px)}._9t79wq_selectPopupOpen{opacity:1;transform:none}._9t79wq_selectPopupClose{opacity:0;pointer-events:none;transform:translateY(-4px)}._9t79wq_selectOption{color:var(--dsw-alias-label-primary);cursor:pointer;white-space:nowrap;text-overflow:ellipsis;border-radius:6px;flex-shrink:0;padding:6px 10px;font-size:13px;line-height:1.5;overflow:hidden}._9t79wq_selectOption:hover,._9t79wq_selectOptionActive{background:var(--dsw-alias-interactive-bg-hover)}._9t79wq_selectOptionSelected{color:var(--dsw-alias-brand-primary);background:color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color) 10%, transparent);font-weight:500}._9t79wq_invalid{color:var(--dsw-alias-state-error-primary,#b42318);margin:0;font-size:12px;line-height:1.5}._9t79wq_hint{color:var(--dsw-alias-label-secondary);margin:0;font-size:12px;line-height:1.5}@media (prefers-reduced-motion:reduce){._9t79wq_card,._9t79wq_header,._9t79wq_mark,._9t79wq_chevron,._9t79wq_chevronOpen,._9t79wq_discard,._9t79wq_save,._9t79wq_selectChevron,._9t79wq_selectChevronOpen,._9t79wq_selectPopup{transition:none}}";
 		const tagId = "@linxin666/dsh-liangshen/packages/dsh-liangshen/src/client/settings-card.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -564,6 +682,7 @@ window.__ModuleLoader__.load({
 			"inputInvalid": "_9t79wq_inputInvalid",
 			"invalid": "_9t79wq_invalid",
 			"label": "_9t79wq_label",
+			"mark": "_9t79wq_mark",
 			"name": "_9t79wq_name",
 			"notExposed": "_9t79wq_notExposed",
 			"pending": "_9t79wq_pending",
@@ -609,22 +728,30 @@ window.__ModuleLoader__.load({
 			const cardClass = expanded ? `${settings_card_module_css_default.cardOpen} ${settings_card_module_css_default.card}` : settings_card_module_css_default.card;
 			const header = alwaysOpen === true ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: settings_card_module_css_default.headerStatic,
-				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-					className: settings_card_module_css_default.headText,
-					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: settings_card_module_css_default.name,
-						title,
-						children: title
-					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: settings_card_module_css_default.description,
-						title: description,
-						children: props.descriptionNode ?? description
-					})]
-				}), state.dirty ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-					className: settings_card_module_css_default.pending,
-					title: props.t("settings.unsaved"),
-					children: props.t("settings.unsaved")
-				}) : null]
+				children: [
+					props.icon !== void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: settings_card_module_css_default.mark,
+						"aria-hidden": "true",
+						children: props.icon
+					}) : null,
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: settings_card_module_css_default.headText,
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: settings_card_module_css_default.name,
+							title,
+							children: title
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: settings_card_module_css_default.description,
+							title: description,
+							children: props.descriptionNode ?? description
+						})]
+					}),
+					state.dirty ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: settings_card_module_css_default.pending,
+						title: props.t("settings.unsaved"),
+						children: props.t("settings.unsaved")
+					}) : null
+				]
 			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
 				type: "button",
 				className: settings_card_module_css_default.header,
@@ -634,6 +761,11 @@ window.__ModuleLoader__.load({
 					setOpen(!open);
 				},
 				children: [
+					props.icon !== void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: settings_card_module_css_default.mark,
+						"aria-hidden": "true",
+						children: props.icon
+					}) : null,
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
 						className: settings_card_module_css_default.headText,
 						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
@@ -665,17 +797,20 @@ window.__ModuleLoader__.load({
 					})
 				]
 			});
-			if (!state.exposed) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", {
-				className: cardClass,
-				children: [header, expanded ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-					className: settings_card_module_css_default.body,
-					children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-						className: settings_card_module_css_default.notExposed,
-						role: "status",
-						children: props.t("settings.notExposed")
-					})
-				}) : null]
-			});
+			if (!state.exposed && props.renderChildrenWhenNotExposed !== true) {
+				const showNotice = props.hideNotExposedNotice !== true;
+				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", {
+					className: cardClass,
+					children: [header, expanded ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						className: settings_card_module_css_default.body,
+						children: showNotice ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+							className: settings_card_module_css_default.notExposed,
+							role: "status",
+							children: props.t("settings.notExposed")
+						}) : null
+					}) : null]
+				});
+			}
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", {
 				className: cardClass,
 				children: [header, expanded ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
@@ -713,6 +848,51 @@ window.__ModuleLoader__.load({
 						})
 					]
 				}) : null]
+			});
+		}
+		/** A staged value field. `numeric` only hints the keypad: which drafts a field accepts is decided by its spec. */
+		function ValueField(props) {
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: settings_card_module_css_default.field,
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: settings_card_module_css_default.head,
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("label", {
+							className: settings_card_module_css_default.label,
+							htmlFor: props.id,
+							children: props.label
+						}), props.overridden ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+							className: settings_card_module_css_default.badges,
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: settings_card_module_css_default.badge,
+								children: props.overriddenLabel
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: settings_card_module_css_default.reset,
+								disabled: props.disabled,
+								onClick: props.onReset,
+								children: props.resetLabel
+							})]
+						}) : null]
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+						id: props.id,
+						className: props.invalid ? settings_card_module_css_default.inputInvalid : settings_card_module_css_default.input,
+						type: "text",
+						...props.numeric === true ? { inputMode: "numeric" } : {},
+						...props.invalid ? { "aria-invalid": true } : {},
+						value: props.text,
+						placeholder: props.placeholder ?? "",
+						disabled: props.disabled,
+						onChange: (event) => {
+							props.onEdit(event.target.value);
+						}
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						className: props.invalid ? settings_card_module_css_default.invalid : settings_card_module_css_default.hint,
+						children: props.invalid ? props.invalidLabel : props.hint
+					})
+				]
 			});
 		}
 		const NON_SKIN_BODY_MARKERS = /* @__PURE__ */ new Set(["dshSkinCenter", "dshSidebarCollapsed"]);
@@ -982,6 +1162,26 @@ window.__ModuleLoader__.load({
 		}
 		//#endregion
 		//#region src/client/settings-form.ts
+		/** A whole- or decimal-number field. An empty draft clears the field; any other draft that is not a finite number within the constraints blocks the save. */
+		function numberField(field, constraints = {}) {
+			const { integer = false, min } = constraints;
+			return {
+				field,
+				format: (value) => typeof value === "number" ? String(value) : "",
+				parse: (text) => {
+					const trimmed = text.trim();
+					if (trimmed === "") return { kind: "clear" };
+					const parsed = Number(trimmed);
+					if (!Number.isFinite(parsed)) return void 0;
+					if (integer && !Number.isInteger(parsed)) return void 0;
+					if (min !== void 0 && parsed < min) return void 0;
+					return {
+						kind: "set",
+						value: parsed
+					};
+				}
+			};
+		}
 		/** A boolean field, edited through true/false draft text. */
 		function booleanField(field) {
 			return {
@@ -1028,31 +1228,33 @@ window.__ModuleLoader__.load({
 			specs;
 			staged = /* @__PURE__ */ new Map();
 			listeners = /* @__PURE__ */ new Set();
-			/** The scope subscription installed in the constructor; released by dispose(). */
-			disposeScope;
+			/** The form subscription installed in the constructor; released by dispose(). */
+			disposeForm;
 			disposed = false;
 			saving = false;
+			/** A save asked for while one was in flight; it runs once the first settles (#1754). */
+			saveQueued = false;
 			failed = false;
 			failedReason;
-			/** @param scope - the bound settings scope for this card's namespace. */
+			/** @param scope - the bound configuration form for this card's namespace. */
 			constructor(scope, specs) {
 				this.scope = scope;
 				this.specs = new Map(specs.map((spec) => [spec.field, spec]));
-				this.disposeScope = scope.subscribe(() => {
+				this.disposeForm = scope.subscribe(() => {
 					this.publish();
 				});
 			}
 			/**
-			* Release the scope subscription and every bound store listener. The card
+			* Release the form subscription and every bound store listener. The card
 			* must call this on teardown; later calls are no-ops.
 			*/
 			dispose() {
 				if (this.disposed) return;
 				this.disposed = true;
-				this.disposeScope();
+				this.disposeForm();
 				this.listeners.clear();
 			}
-			/** Publish a projection of this form, rebuilt whenever the scope or a draft changes. */
+			/** Publish a projection of this form, rebuilt whenever the form or a draft changes. */
 			bind(project) {
 				const store = createSnapshotStore(project());
 				this.listeners.add(() => {
@@ -1107,7 +1309,7 @@ window.__ModuleLoader__.load({
 						});
 					},
 					save: () => {
-						this.save();
+						this.requestSave();
 					},
 					discard: () => {
 						if (this.staged.size === 0 && !this.failed) return;
@@ -1119,21 +1321,44 @@ window.__ModuleLoader__.load({
 				};
 			}
 			/**
-			* Write every staged edit in one atomic scope mutation, then re-seed from
+			* Write every staged edit in one atomic form mutation, then re-seed from
 			* what the Host accepted.
 			*
 			* The whole batch rides one mutate, so cross-field validate hooks
 			* (baseURL+model) judge it as a unit: the Host either applies every write
-			* or refuses the batch. The 0.1.2 scope contract never rejects a refused
-			* mutation — the scope recovers with a fresh Host view and resolves — so
-			* resolution alone proves nothing: the outcome is judged by reading the
-			* settled snapshot back, one planned write at a time, and one missed write
-			* fails the whole save. A scope that still rejects on refusal (the dsh-web
-			* bridge scope) reports through the same failure path with its rejection
-			* message. A save that did not land keeps its drafts, so the user can
-			* correct them instead of retyping.
+			* or refuses the batch. The form contract answers a refusal or a skipped
+			* write with `false` (it recovers with a fresh Host view instead of
+			* throwing), so the outcome is judged twice: the answer itself, and then the
+			* settled snapshot read back one planned write at a time. One missed write
+			* fails the whole save. A transport that rejects instead (the dsh-web bridge
+			* controller on a dead connection) reports through the same failure path
+			* with its rejection message. A save that did not land keeps its drafts, so
+			* the user can correct them instead of retyping.
 			* @returns settlement after the mutation and the read-back.
 			*/
+			/**
+			* Run one save, and re-run it once if another was asked for while this one
+			* was still in flight.
+			*
+			* A save is a Host round trip that also drives the profile reconcile, and
+			* the Host runs that write inside one exclusive transaction. Answering a
+			* press that arrives mid-flight by returning immediately dropped the edit
+			* with no explanation, which is the "the save button stops working after a
+			* few rounds" report (#1754). Serializing instead means a save pressed while
+			* another is still settling runs against the settled state - which is what
+			* the operator meant by pressing it again.
+			* @returns settlement after the mutation and the read-back.
+			*/
+			async requestSave() {
+				if (this.saving) {
+					this.saveQueued = true;
+					return;
+				}
+				await this.save();
+				if (!this.saveQueued) return;
+				this.saveQueued = false;
+				await this.requestSave();
+			}
 			async save() {
 				const plan = this.plan();
 				const valid = plan.filter((item) => item.judge !== void 0);
@@ -1153,12 +1378,13 @@ window.__ModuleLoader__.load({
 					path: [item.field]
 				});
 				let failedReason;
+				let accepted = false;
 				try {
-					await this.scope.mutate(ops);
+					accepted = await this.scope.mutate(ops);
 				} catch (error) {
 					failedReason = error instanceof Error ? error.message : String(error);
 				}
-				const landed = failedReason === void 0 && valid.every((item) => item.judge());
+				const landed = accepted && failedReason === void 0 && valid.every((item) => item.judge());
 				for (const [field, before] of pending) if (landed && this.staged.get(field) === before) this.staged.delete(field);
 				this.saving = false;
 				this.failed = !landed;
@@ -1271,16 +1497,37 @@ window.__ModuleLoader__.load({
 			"native",
 			"both"
 		];
-		/** Bridges the `dsh-liangshen` scope onto the card's staged form. */
+		/** Sensitivity presets for the circuit breaker (mirrors the Host schema). */
+		const SENSITIVITY_CHOICES = [
+			"conservative",
+			"balanced",
+			"aggressive"
+		];
+		/** Bridges the `liangshen` settings form onto the card's staged form. */
 		var LiangShenSettingsCardController = class {
 			form;
 			store;
-			/** @param scope - the bound settings scope for the `dsh-liangshen` namespace. */
+			/** @param scope - the bound configuration form of the entry that owns this namespace. */
 			constructor(scope) {
 				this.form = new CardForm(scope, [
 					booleanField("enabled"),
 					booleanField("announceToAgent"),
-					choiceField("presentation", PRESENTATION_CHOICES)
+					choiceField("presentation", PRESENTATION_CHOICES),
+					booleanField("dispatcher"),
+					booleanField("guardEnabled"),
+					choiceField("guardSensitivity", SENSITIVITY_CHOICES),
+					numberField("guardStallReasoningChars", {
+						integer: true,
+						min: 200
+					}),
+					numberField("guardGlobalStallCap", {
+						integer: true,
+						min: 2
+					}),
+					numberField("guardEchoFailures", {
+						integer: true,
+						min: 2
+					})
 				]);
 				this.store = this.form.bind(() => this.projection());
 			}
@@ -1289,7 +1536,13 @@ window.__ModuleLoader__.load({
 					...this.form.shell(),
 					enabled: this.form.field("enabled"),
 					announceToAgent: this.form.field("announceToAgent"),
-					presentation: this.form.field("presentation")
+					presentation: this.form.field("presentation"),
+					dispatcher: this.form.field("dispatcher"),
+					guardEnabled: this.form.field("guardEnabled"),
+					guardSensitivity: this.form.field("guardSensitivity"),
+					guardStallReasoningChars: this.form.field("guardStallReasoningChars"),
+					guardGlobalStallCap: this.form.field("guardGlobalStallCap"),
+					guardEchoFailures: this.form.field("guardEchoFailures")
 				};
 			}
 			/**
@@ -1326,8 +1579,11 @@ window.__ModuleLoader__.load({
 				t,
 				titleKey: "settings.title",
 				descriptionKey: "settings.description",
+				icon: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(LiangShenMark, {}),
 				defaultOpen: false,
 				state,
+				renderChildrenWhenNotExposed: true,
+				hideNotExposedNotice: true,
 				onSave: props.save,
 				onDiscard: props.discard,
 				children: [
@@ -1377,6 +1633,98 @@ window.__ModuleLoader__.load({
 						onReset: () => {
 							props.resetField("presentation");
 						}
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(BooleanField, {
+						id: "settings-liangshen-dispatcher",
+						label: t("settings.dispatcher"),
+						hint: t("settings.dispatcherHint"),
+						onLabel: t("settings.on"),
+						offLabel: t("settings.off"),
+						...fieldProps,
+						...state.dispatcher,
+						onEdit: (text) => {
+							props.edit("dispatcher", text);
+						},
+						onReset: () => {
+							props.resetField("dispatcher");
+						}
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(BooleanField, {
+						id: "settings-liangshen-guard-enabled",
+						label: t("settings.guardEnabled"),
+						hint: t("settings.guardEnabledHint"),
+						onLabel: t("settings.on"),
+						offLabel: t("settings.off"),
+						...fieldProps,
+						...state.guardEnabled,
+						onEdit: (text) => {
+							props.edit("guardEnabled", text);
+						},
+						onReset: () => {
+							props.resetField("guardEnabled");
+						}
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ChoiceField, {
+						id: "settings-liangshen-guard-sensitivity",
+						label: t("settings.guardSensitivity"),
+						hint: t("settings.guardSensitivityHint"),
+						choices: SENSITIVITY_CHOICES.map((choice) => ({
+							value: choice,
+							label: t(`sensitivity.${choice}`)
+						})),
+						...fieldProps,
+						...state.guardSensitivity,
+						onEdit: (text) => {
+							props.edit("guardSensitivity", text);
+						},
+						onReset: () => {
+							props.resetField("guardSensitivity");
+						}
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ValueField, {
+						id: "settings-liangshen-guard-stall-chars",
+						numeric: true,
+						label: t("settings.guardStallChars"),
+						hint: t("settings.guardStallCharsHint"),
+						placeholder: t("settings.guardAdaptive"),
+						...fieldProps,
+						...state.guardStallReasoningChars,
+						onEdit: (text) => {
+							props.edit("guardStallReasoningChars", text);
+						},
+						onReset: () => {
+							props.resetField("guardStallReasoningChars");
+						}
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ValueField, {
+						id: "settings-liangshen-guard-global-cap",
+						numeric: true,
+						label: t("settings.guardGlobalCap"),
+						hint: t("settings.guardGlobalCapHint"),
+						placeholder: t("settings.guardAdaptive"),
+						...fieldProps,
+						...state.guardGlobalStallCap,
+						onEdit: (text) => {
+							props.edit("guardGlobalStallCap", text);
+						},
+						onReset: () => {
+							props.resetField("guardGlobalStallCap");
+						}
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ValueField, {
+						id: "settings-liangshen-guard-echo",
+						numeric: true,
+						label: t("settings.guardEchoFailures"),
+						hint: t("settings.guardEchoFailuresHint"),
+						placeholder: t("settings.guardAdaptive"),
+						...fieldProps,
+						...state.guardEchoFailures,
+						onEdit: (text) => {
+							props.edit("guardEchoFailures", text);
+						},
+						onReset: () => {
+							props.resetField("guardEchoFailures");
+						}
 					})
 				]
 			});
@@ -1408,11 +1756,13 @@ window.__ModuleLoader__.load({
 			"settings.title": "梁神模式",
 			"settings.description": "控制本插件与工具面呈现方式。",
 			"settings.enabled": "启用梁神模式",
-			"settings.enabledHint": "关闭后预设同步与 agent 公告都不执行。",
+			"settings.enabledHint": "关闭后不声明预设、也不发 agent 公告。",
 			"settings.announceToAgent": "向 agent 公告本插件",
 			"settings.announceToAgentHint": "开启后向每一轮 agent 系统提示注入本插件公告；默认关闭以保持提示词干净。",
 			"settings.presentation": "工具面呈现方式",
-			"settings.presentationHint": "写入同步后的预设：ptc 把 wire 收拢为 run_code；native 保持原生工具清单；both 让两者同驻。改动需重启 DSH 生效。",
+			"settings.presentationHint": "写入本插件声明的预设的 tool-catalog 行：both（出厂默认）让原生清单与 run_code 同驻（原生直调优先）；native 保持原生工具清单；ptc 把 wire 收拢为 run_code。改动立即生效，但已开始的会话保持其已声明的组合。",
+			"settings.dispatcher": "调度者身份",
+			"settings.dispatcherHint": "开启后本模式按调度 Agent 工作：先分诊复杂度（L0/L1 直接执行，L2 走完整流程），L2 任务先澄清访谈再规划，由主代理派发子代理并逐层审查与验收。与工具面呈现方式无关，只决定身份与流程纪律。出厂默认开启；关闭后回到仅含工作纪律的极简 persona。",
 			"settings.on": "开",
 			"settings.off": "关",
 			"settings.inherit": "继承（跟随部署默认）",
@@ -1430,7 +1780,21 @@ window.__ModuleLoader__.load({
 			"settings.invalidValue": "该取值不被接受",
 			"presentation.ptc": "ptc（仅 run_code）",
 			"presentation.native": "native（原生工具清单）",
-			"presentation.both": "both（两者同驻）"
+			"presentation.both": "both（两者同驻）",
+			"settings.guardEnabled": "启用退化熔断器",
+			"settings.guardEnabledHint": "运行时检测思考退化（连续零产出长思考 / 同参重复失败），触发时注入熔断提示；仅停摆信号额外临时下调推理档位（max→high，不下探到甜区以下）。关闭后不干预任何请求。",
+			"settings.guardStallChars": "单步暴走字符阈值",
+			"settings.guardStallCharsHint": "留空即按推理档位自适应：max 档 8000 / high 档 12000 / low 档 20000 字符（按 V4.1 官方 384K 最大输出校准，约 2-4K 思考 token），再按灵敏度预设缩放。填写本字段则以该固定值覆盖所有档位。",
+			"settings.guardGlobalCap": "慢烧连续步数",
+			"settings.guardGlobalCapHint": "留空即按灵敏度预设缩放（均衡档为 4）；provider 不持久化推理文本的会话也以此为兜底步骤计数。填写本字段则以该固定值覆盖。步数越小越敏感，真实长调查建议调大。",
+			"settings.guardSensitivity": "熔断灵敏度",
+			"settings.guardSensitivityHint": "整体缩放熔断阈值：保守（更少打断，阈值×1.5）、均衡（出厂校准值）、激进（更早触发，阈值×0.5）。仅在对应细调字段留空时生效——阈值随推理档位自适应：max 档 8000 / high 档 12000 / low 档 20000 字符。",
+			"sensitivity.conservative": "保守（少打断）",
+			"sensitivity.balanced": "均衡（默认）",
+			"sensitivity.aggressive": "激进（早触发）",
+			"settings.guardEchoFailures": "同参连续失败次数",
+			"settings.guardEchoFailuresHint": "留空即按灵敏度预设缩放（均衡档为 3）；填写本字段则以该固定值覆盖。空转信号只注入熔断消息，不下调推理档位。",
+			"settings.guardAdaptive": "自适应"
 		};
 		/** English counterpart; the key set mirrors {@link zh} exactly. */
 		const en = {
@@ -1452,11 +1816,13 @@ window.__ModuleLoader__.load({
 			"settings.title": "LiangShen mode",
 			"settings.description": "Controls this plugin and the wire presentation.",
 			"settings.enabled": "Enable LiangShen mode",
-			"settings.enabledHint": "When off, neither preset sync nor the agent announcement runs.",
+			"settings.enabledHint": "When off, the preset is not declared and the agent announcement does not run.",
 			"settings.announceToAgent": "Announce this plugin to agents",
 			"settings.announceToAgentHint": "Adds this plugin announcement to every agent system prompt; off by default so prompts stay clean.",
 			"settings.presentation": "Wire presentation",
-			"settings.presentationHint": "Written into the synced preset: ptc collapses the wire to run_code; native keeps the native roster; both keeps them co-resident. Restart DSH for a change to take effect.",
+			"settings.presentationHint": "Written into the tool-catalog row of the preset this plugin declares: both (the shipped default) keeps the roster and run_code co-resident (direct native calls first); native keeps the native roster; ptc collapses the wire to run_code. A change re-declares the preset immediately; sessions that already started keep the composition they declared.",
+			"settings.dispatcher": "Dispatcher identity",
+			"settings.dispatcherHint": "When on, the mode works as a dispatcher agent: it triages complexity first (L0/L1 work is done directly, an L2 task runs the full flow), clarifies an L2 task through an interview before planning, and the lead agent dispatches subagents and reviews and accepts them layer by layer. It is unrelated to the wire presentation and decides identity and process discipline only. On by default; switching it off returns the prompt to the bare persona with its working discipline.",
 			"settings.on": "On",
 			"settings.off": "Off",
 			"settings.inherit": "Inherit (deployment default)",
@@ -1474,7 +1840,21 @@ window.__ModuleLoader__.load({
 			"settings.invalidValue": "The value is not accepted",
 			"presentation.ptc": "ptc (run_code only)",
 			"presentation.native": "native (native tool roster)",
-			"presentation.both": "both (both co-resident)"
+			"presentation.both": "both (both co-resident)",
+			"settings.guardEnabled": "Degeneration circuit breaker",
+			"settings.guardEnabledHint": "Detects reasoning degeneration at runtime (consecutive zero-output long reasoning / repeated identical-argument failures) and injects a breaker message; only a stall also steps the reasoning effort down (max to high, never below the sweet spot). Disabled means requests are never touched.",
+			"settings.guardStallChars": "Runaway reasoning character floor",
+			"settings.guardStallCharsHint": "Leave empty to adapt to the reasoning effort: 8000 at max / 12000 at high / 20000 at low characters (calibrated against V4.1's official 384K max output, roughly 2-4K thinking tokens), then scaled by the sensitivity preset. Setting a value pins it for every effort level.",
+			"settings.guardGlobalCap": "Slow-burn step count",
+			"settings.guardGlobalCapHint": "Leave empty to scale with the sensitivity preset (4 at balanced); it is also the fallback step count for a session whose provider persists no reasoning text. Setting a value pins it. Lower is more sensitive — raise it for genuinely long investigations.",
+			"settings.guardSensitivity": "Breaker sensitivity",
+			"settings.guardSensitivityHint": "Scales every breaker threshold: conservative (fewer interruptions, x1.5), balanced (the calibrated defaults), aggressive (fires earlier, x0.5). It applies only where the matching fine-tuning field is left empty — thresholds adapt to the reasoning effort: 8000 at max / 12000 at high / 20000 at low.",
+			"sensitivity.conservative": "Conservative (fewer interruptions)",
+			"sensitivity.balanced": "Balanced (default)",
+			"sensitivity.aggressive": "Aggressive (fires earlier)",
+			"settings.guardEchoFailures": "Identical-argument failures",
+			"settings.guardEchoFailuresHint": "Leave empty to scale with the sensitivity preset (3 at balanced); setting a value pins it. An echo only injects the breaker message — it never steps the reasoning effort down.",
+			"settings.guardAdaptive": "Adaptive"
 		};
 		//#endregion
 		//#region src/client/plugin-card-seat.ts
@@ -1486,22 +1866,24 @@ window.__ModuleLoader__.load({
 		*
 		* - `web-ui.plugin.item` — the list seat declared by the dsh-web-settings
 		*   group section (this family's own first-level "Web UI plugins" section);
-		* - `settings.plugin.item` — the official keyed seat of the harness's
-		*   `ui-settings-plugins` tab, keyed by the settings namespace the card edits.
+		* - `plugins.bundle.config` — the official keyed seat of the harness's plugin
+		*   manager page, keyed by the bundle's package name and rendered on that
+		*   bundle's page. alpha.2 removed the `settings.plugin.item` keyed seat of the
+		*   `ui-settings-plugins` tab that this helper used before, so a card keyed by
+		*   its settings namespace has no seat to land in any more.
 		*
-		* SEAT SELECTION IS NOT A DECLARATION PROBE. The official `ui-settings-plugins`
-		* row belongs to the harness bundle and its `configurable` tab always declares
-		* `settings.plugin.item` before any external plugin's `apply()` runs, so
-		* "is the official seat declared?" answers yes even in the deployment whose
-		* whole point is the family group. Choosing on that probe sends every family
-		* card to the official Plugins tab and leaves the group's own section
-		* permanently empty — the family of reports where the section renders its
-		* heading and zero cards.
+		* SEAT SELECTION IS NOT A DECLARATION PROBE. The official plugin surface
+		* belongs to the harness bundle and declares its seats before any external
+		* plugin's `apply()` runs, so "is the official seat declared?" answers yes even
+		* in the deployment whose whole point is the family group. Choosing on that
+		* probe sends every family card to the official page and leaves the group's own
+		* section permanently empty — the family of reports where the section renders
+		* its heading and zero cards.
 		*
 		* The signal that actually distinguishes the two deployments is whether
 		* dsh-web-settings is loaded: it is the package that owns the group section and
 		* it publishes the `webUiSettings` service during `apply()`, which every
-		* family plugin already reads for its settings scope. Group loaded -> the family
+		* family plugin already reads for its settings form. Group loaded -> the family
 		* seat; group absent -> the official seat.
 		*
 		* The decision is re-evaluated on every `slots/changed` because the group may
@@ -1517,8 +1899,8 @@ window.__ModuleLoader__.load({
 		*/
 		/** The family list seat key. */
 		const FAMILY_PLUGIN_CARD_SEAT = "web-ui.plugin.item";
-		/** The official keyed plugin-card seat key. */
-		const OFFICIAL_PLUGIN_CARD_SEAT = "settings.plugin.item";
+		/** The official keyed plugin-card seat key (the alpha.2 bundle-configuration seat). */
+		const OFFICIAL_PLUGIN_CARD_SEAT = "plugins.bundle.config";
 		/** The service dsh-web-settings publishes while it is loaded. */
 		const FAMILY_GROUP_SERVICE = "webUiSettings";
 		/**
@@ -1578,11 +1960,13 @@ window.__ModuleLoader__.load({
 						...seat.order === void 0 ? {} : { order: seat.order },
 						...seat.label === void 0 ? {} : { label: seat.label },
 						locale: seat.locale,
+						...seat.children === void 0 ? {} : { children: seat.children },
 						...seat.inject === void 0 ? {} : { inject }
 					} : {
 						name: OFFICIAL_PLUGIN_CARD_SEAT,
-						key: seat.namespace,
+						key: seat.bundle,
 						locale: seat.locale,
+						...seat.children === void 0 ? {} : { children: seat.children },
 						...seat.inject === void 0 ? {} : { inject }
 					}, component);
 					current = target;
@@ -1600,22 +1984,178 @@ window.__ModuleLoader__.load({
 			reconcile();
 		}
 		//#endregion
+		//#region src/client/settings-entry-form.ts
+		/** The snapshot a form reports before the Host has answered with this entry. */
+		function pendingSnapshot() {
+			return {
+				status: "loading",
+				value: void 0,
+				base: void 0,
+				user: void 0,
+				revision: void 0,
+				writable: false,
+				mode: "host"
+			};
+		}
+		/**
+		* Create a settings form bound to the profile entry id this Host serves, and
+		* rebound whenever the shared describe mirror names a different one of this
+		* package's rows.
+		* @param options - the shared forms service and this package's candidate row ids.
+		* @returns a form delegating to the currently resolved entry's own form.
+		*/
+		function createServedEntryForm(options) {
+			const { forms, entryIds } = options;
+			const fallbackId = entryIds[0];
+			const namespaceId = entryIds[entryIds.length - 1];
+			const listeners = /* @__PURE__ */ new Set();
+			let boundId;
+			let bound;
+			let offBound;
+			let snapshot = pendingSnapshot();
+			/** Republish: the delegated snapshot when one is bound, the pending one otherwise. */
+			const publish = () => {
+				if (bound !== void 0) snapshot = bound.getSnapshot();
+				for (const listener of [...listeners]) listener();
+			};
+			/**
+			* The entry id the mirror currently justifies. An unanswered or empty mirror
+			* is not evidence of absence, so it keeps the first candidate; a mirror that
+			* answers without any of this package's rows leaves the namespace itself.
+			* @returns the entry id to bind.
+			*/
+			const resolve = () => {
+				let served;
+				try {
+					served = forms.describe().getSnapshot().view?.namespaces.map((row) => row.ns);
+				} catch {
+					served = void 0;
+				}
+				if (served === void 0 || served.length === 0) return fallbackId;
+				return entryIds.find((id) => served.includes(id)) ?? namespaceId;
+			};
+			/** Bind (or rebind) the resolved entry's form; a no-op while it is unchanged. */
+			const bind = () => {
+				const target = resolve();
+				if (target === boundId) return;
+				offBound?.();
+				offBound = void 0;
+				let form;
+				try {
+					form = forms.get(target);
+				} catch {
+					boundId = void 0;
+					return;
+				}
+				boundId = target;
+				bound = form;
+				offBound = form.subscribe(() => {
+					publish();
+				});
+				publish();
+			};
+			try {
+				forms.describe().subscribe(() => {
+					bind();
+				});
+			} catch {}
+			bind();
+			return {
+				getSnapshot: () => snapshot,
+				subscribe: (listener) => {
+					listeners.add(listener);
+					return () => {
+						listeners.delete(listener);
+					};
+				},
+				set: (field, value) => bound?.set(field, value) ?? Promise.resolve(false),
+				unset: (field) => bound?.unset(field) ?? Promise.resolve(false),
+				mutate: (ops, expectedRevision) => bound?.mutate(ops, expectedRevision) ?? Promise.resolve(false)
+			};
+		}
+		//#endregion
 		//#region src/client/index.ts
 		/** Locale namespace this half owns. */
 		const NS = "liangshen";
-		/** Settings namespace the settings card edits (the Host plugin registers it). */
-		const SETTINGS_NAMESPACE = "dsh-liangshen";
 		/**
-		* Required client services: the slot registry, locale, sessions, and the roster
-		* Remote. Both `remote` and `remote.agentPresets` are declared: the context
-		* proxy refuses an uninjected service, and a nested service name does not imply
-		* its parent, so reading `ctx.remote.agentPresets` needs `remote` as well.
+		* Settings namespace the settings card edits: the family identity of this
+		* plugin's own settings form, and the row id a standalone bundle install
+		* carries. The aggregate install mounts the generated `web-ui-liangshen` row
+		* instead, and the family binder resolves between the two.
+		*/
+		const SETTINGS_NAMESPACE = "liangshen";
+		/**
+		* Profile entry id the family aggregate's generated row carries — the shape
+		* nearly every user runs, and the id the shared-forms fallback binds when the
+		* family binder cannot resolve the namespace.
+		*/
+		const AGGREGATE_ENTRY_ID = "web-ui-liangshen";
+		/** Profile entry ids this package's patch rows carry, most specific first. */
+		const LIANGSHEN_ENTRY_IDS = [
+			AGGREGATE_ENTRY_ID,
+			"ui-liangshen",
+			SETTINGS_NAMESPACE
+		];
+		/**
+		* The profile entry id this package's own row carries, for a page that serves
+		* no family binder.
+		*
+		* The shared describe mirror is the only local evidence of which row id this
+		* profile actually serves, but it answers asynchronously: at plugin activation
+		* it usually holds nothing yet. An unanswered or empty mirror is therefore NOT
+		* evidence of absence, and binding the bare namespace there is what made every
+		* save fail with `No configurable plugin entry "liangshen"` — the form is
+		* bound once per session, so a wrong guess never recovers. The aggregate row id
+		* is the answer that matches nearly every deployment; only a mirror that
+		* answers with OTHER plugins' rows keeps the namespace as the last resort (the
+		* pre-0.1.7 keying shape), because that answer is the one that actually proves
+		* this package's own row is not served.
+		* @param forms - the shared configuration forms service.
+		* @returns the entry id to bind.
+		*/
+		function servedEntryId(forms) {
+			let served;
+			try {
+				served = forms.describe().getSnapshot().view?.namespaces.map((view) => view.ns);
+			} catch {
+				served = void 0;
+			}
+			if (served === void 0 || served.length === 0) return AGGREGATE_ENTRY_ID;
+			return LIANGSHEN_ENTRY_IDS.find((id) => served.includes(id)) ?? "liangshen";
+		}
+		/**
+		* Bind the settings form the card stages over.
+		*
+		* The family binder comes first: it is what resolves this package's family
+		* namespace onto the profile entry id the Host serves the form under, and it
+		* keeps the loopback bridge as its own fallback. A page without that group (or
+		* one where its client half has not applied yet) binds through the shared forms
+		* service, on the entry id the describe mirror justifies and rebound as soon as
+		* the mirror answers — see {@link createServedEntryForm} for why a one-shot
+		* guess cannot be right for both an aggregate and a standalone install.
+		* @param ctx - the browser plugin context.
+		* @returns the form the settings card reads and writes.
+		*/
+		function bindSettingsForm(ctx) {
+			const binder = ctx.get("webUiSettings");
+			if (binder !== void 0 && typeof binder.bind === "function") return binder.bind({ namespace: SETTINGS_NAMESPACE });
+			return createServedEntryForm({
+				forms: ctx.configForms,
+				entryIds: LIANGSHEN_ENTRY_IDS
+			});
+		}
+		/**
+		* Required client services: the slot registry, locale, sessions, the shared
+		* configuration forms, and the roster Remote. Both `remote` and
+		* `remote.agentPresets` are declared: the context proxy refuses an uninjected
+		* service, and a nested service name does not imply its parent, so reading
+		* `ctx.remote.agentPresets` needs `remote` as well.
 		*/
 		const inject = [
 			"slots",
 			"locale",
 			"sessions",
-			"settingsScope",
+			"configForms",
 			"remote",
 			"remote.agentPresets"
 		];
@@ -1641,9 +2181,9 @@ window.__ModuleLoader__.load({
 				controller.start();
 			} catch {}
 			try {
-				const settingsCard = new LiangShenSettingsCardController((ctx.get("webUiSettings") ?? ctx.settingsScope).bind({ namespace: SETTINGS_NAMESPACE }));
+				const settingsCard = new LiangShenSettingsCardController(bindSettingsForm(ctx));
 				installPluginCard(ctx, {
-					namespace: SETTINGS_NAMESPACE,
+					bundle: "@linxin666/dsh-liangshen",
 					id: "liangshen",
 					order: 120,
 					locale: NS,
@@ -1677,9 +2217,11 @@ window.__ModuleLoader__.load({
 		exports.NS = NS;
 		exports.SETTINGS_NAMESPACE = SETTINGS_NAMESPACE;
 		exports.apply = apply;
+		exports.bindSettingsForm = bindSettingsForm;
 		exports.inject = inject;
 		exports.leverState = leverState;
 		exports.restoreTarget = restoreTarget;
+		exports.servedEntryId = servedEntryId;
 		return module.exports;
 	}
 });

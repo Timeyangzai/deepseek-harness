@@ -52,6 +52,24 @@ describe('concrete terminology policy', () => {
     )).toEqual([])
   })
 
+  it('retains upstream plugin data fields without exempting locally maintained files', () => {
+    for (const file of [
+      'compat-plugins/dsh-purge/client.js',
+      'compat-plugins/dsh-purge/lib/redteam/schema.js',
+      'compat-plugins/dsh-purge/skills/redteam/passive-recon.md',
+    ]) {
+      expect(findConcreteTermViolations(file, blockedTerm)).toEqual([])
+    }
+    for (const file of [
+      'compat-plugins/README.zh-CN.md',
+      'compat-plugins/dsh-purge/lib/identity.js',
+      'compat-plugins/dsh-purge/lib/redteam/new-file.js',
+      'compat-plugins/dsh-purge/lib/redteam/schema.js.backup',
+    ]) {
+      expect(findConcreteTermViolations(file, blockedTerm)).toEqual([{ file, line: 1 }])
+    }
+  })
+
   it('excludes vendored sources and frozen Agent Notes', () => {
     expect(findConcreteTermViolations(`vendor/example/${blockedTerm}.ts`, blockedTerm)).toEqual([])
     expect(findConcreteTermViolations(

@@ -1,0 +1,55 @@
+# Supply the gateway URL in HARNESS_MODEL_BASE_URL before launching Harness.
+# Store DEEPSEEK_API_KEY and SELF_API_KEY through Harness's credentials settings.
+- id: llm-deepseek
+  name: '@deepseek-ai/dsh-llm-deepseek-api-key'
+  config:
+    baseURL: !!js process.env.HARNESS_MODEL_BASE_URL ?? 'https://gateway.example.invalid/v1'
+    models:
+      - id: global/deepseek-v4.1-flash
+        name: deepseek-v4.1-flash
+        contextWindow: 1000000
+        inputModalities: [text, image]
+        systemPromptUpdate: in-history
+      - id: global/hy3
+        name: hy3
+- id: agent-default-model
+  name: '@deepseek-ai/dsh-agent-default-model'
+  config:
+    provider: opencode-zen-free-provider
+    model: deepseek-v4.1-flash-free
+- id: locale
+  name: '@deepseek-ai/dsh-client-locale'
+  config:
+    preference: zh
+- id: ui-chat
+  name: '@deepseek-ai/dsh-client-ui-chat'
+  config:
+    transcriptView: verbose
+    performanceUsage: detailed
+- id: ui-settings
+  name: '@deepseek-ai/dsh-client-ui-settings'
+  config:
+    enabled: true
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      self:
+        apiKeyEnv: SELF_API_KEY
+        api: openai-completions
+        baseURL: !!js process.env.HARNESS_MODEL_BASE_URL ?? 'https://gateway.example.invalid/v1'
+        models:
+          - id: global/deepseek-v4.1-flash
+            name: deepseek-v4.1-flash
+            contextWindow: 1000000
+            maxTokens: 256
+            input: [text, image]
+          - id: glm-5.3-flash-trial
+            name: glm-5.3-flash
+            contextWindow: 1000000
+            maxTokens: 1000000
+          - id: gpt-6-luna-trial
+            name: gpt-6-luna
+            input: [text, image]
+            contextWindow: 1000000
+            maxTokens: 1000000

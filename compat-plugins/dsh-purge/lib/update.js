@@ -1,17 +1,17 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { promises as fsp } from "node:fs";
+import http from "node:http";
+import https from "node:https";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { findDshHome } from "./core.js";
-import { adapterFor, detectSurface } from "./surface.js";
-import { cliInvocation } from "./desktop.js";
+import { atomicWriteSync, findDshHome } from "./core.js";
+import { extractZipArchive } from "./zip-extract.js";
 
 const REPO = "YuJunZhiXue/dsh-purge";
 const STABLE_REF = "master";
 const BETA_REF = "beta";
-export const TARBALL_URL = `https://github.com/${REPO}/archive/refs/heads/${STABLE_REF}.tar.gz`;
 const PLUGIN_ROOT = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const CHANNELS = {
   stable: { id: "stable", ref: STABLE_REF, label: "正式版" },
@@ -37,6 +37,18 @@ const HIDDEN = {
   timeout: 20000,
 };
 
+// 只允许来自 GitHub / jsdelivr 的 302 跳转落地,阻挡中间人把下载指向任意主机。
+const UPDATE_REDIRECT_ALLOWED_HOSTS = new Set([
+  "github.com",
+  "codeload.github.com",
+  "api.github.com",
+  "raw.githubusercontent.com",
+  "objects.githubusercontent.com",
+  "release-assets.githubusercontent.com",
+  "cdn.jsdelivr.net",
+]);
+const MAX_UPDATE_BYTES = 50 * 1024 * 1024;
+
 export function pluginRoot() {
   return PLUGIN_ROOT;
 }
@@ -60,6 +72,18 @@ function historyPath() {
 
 function stampPath() {
   return path.join(findDshHome(), "dsh-purge", "installed-rev");
+}
+
+function autoUpdateGuardPath() {
+  return path.join(findDshHome(), "dsh-purge", "auto-update-guard.json");
+}
+
+function markAutoUpdateGuard(ref, sha = "") {
+  atomicWriteSync(autoUpdateGuardPath(), `${JSON.stringify({
+    ref: String(ref || ""),
+    sha: String(sha || ""),
+    at: new Date().toISOString(),
+  }, null, 2)}\n`);
 }
 
 export function normalizeChannel(value) {
@@ -96,12 +120,35 @@ export function versionIsNewer(remote, local) {
   return a.pre > b.pre;
 }
 
+export function latestStableVersion(versions) {
+  let best = "";
+  for (const item of versions || []) {
+    if (!item || item.channel === "beta") continue;
+    const ver = String(item.version || "").replace(/^v/i, "");
+    if (!/^\d+\.\d+\.\d+/.test(ver) || isBetaName(ver)) continue;
+    if (!best || versionIsNewer(ver, best)) best = ver;
+  }
+  return best;
+}
+
+/** 测试通道只认 beta 分支头。旧的 beta/rc/pre 标签不列出。 */
+export function hideListedVersion(item, _stableVersion = "") {
+  if (!item || withdrawnVersion(item)) return true;
+  if (item.ref === BETA_REF && item.channel === "beta") return false;
+  return item.channel === "beta" || isBetaName(item.version) || isBetaName(item.ref) || isBetaName(item.id);
+}
+
 export function readChannelState() {
   const raw = readJson(channelStatePath()) || {};
-  return {
-    channel: normalizeChannel(raw.channel),
-    pin: typeof raw.pin === "string" ? raw.pin.trim() : "",
+  const stored = String(raw.channel || "").toLowerCase();
+  const pin = typeof raw.pin === "string" ? raw.pin.trim() : "";
+  const channel = stored === "beta" ? "beta" : "stable";
+  const state = {
+    channel,
+    pin: isBetaName(pin) || pin === BETA_REF ? "" : pin,
   };
+  if ((stored === "beta") !== (channel === "beta") || state.pin !== pin) writeChannelState(state);
+  return state;
 }
 
 function writeChannelState(next) {
@@ -109,8 +156,7 @@ function writeChannelState(next) {
     channel: normalizeChannel(next?.channel),
     pin: typeof next?.pin === "string" ? next.pin.trim() : "",
   };
-  fs.mkdirSync(path.dirname(channelStatePath()), { recursive: true });
-  fs.writeFileSync(channelStatePath(), `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  atomicWriteSync(channelStatePath(), `${JSON.stringify(state, null, 2)}\n`);
   return state;
 }
 
@@ -135,26 +181,22 @@ function readHistory() {
 
 function pushHistory(entry) {
   const next = [entry, ...readHistory().filter((item) => item && item.ref !== entry.ref)].slice(0, 20);
-  fs.mkdirSync(path.dirname(historyPath()), { recursive: true });
-  fs.writeFileSync(historyPath(), `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  atomicWriteSync(historyPath(), `${JSON.stringify(next, null, 2)}\n`);
 }
 
+/** 直连 codeload，避免 github.com/archive → 302 在 Electron/部分 Node 下变成 http 302 / fetch failed。 */
 function archiveZipUrl(ref) {
   const value = String(ref || STABLE_REF);
-  if (/^[0-9a-f]{40}$/i.test(value)) return `https://github.com/${REPO}/archive/${value}.zip`;
-  if (/^v?\d/.test(value)) return `https://github.com/${REPO}/archive/refs/tags/${encodeURIComponent(value)}.zip`;
-  return `https://github.com/${REPO}/archive/refs/heads/${encodeURIComponent(value)}.zip`;
+  if (/^[0-9a-f]{40}$/i.test(value)) return `https://codeload.github.com/${REPO}/zip/${value}`;
+  if (/^v?\d/.test(value)) return `https://codeload.github.com/${REPO}/zip/refs/tags/${encodeURIComponent(value)}`;
+  return `https://codeload.github.com/${REPO}/zip/refs/heads/${encodeURIComponent(value)}`;
 }
 
 function archiveTarballUrl(ref) {
   const value = String(ref || STABLE_REF);
-  if (/^[0-9a-f]{40}$/i.test(value)) return `https://github.com/${REPO}/archive/${value}.tar.gz`;
-  if (/^v?\d/.test(value)) return `https://github.com/${REPO}/archive/refs/tags/${encodeURIComponent(value)}.tar.gz`;
-  return `https://github.com/${REPO}/archive/refs/heads/${encodeURIComponent(value)}.tar.gz`;
-}
-
-function githubSpec(ref) {
-  return `github:${REPO}#${ref || STABLE_REF}`;
+  if (/^[0-9a-f]{40}$/i.test(value)) return `https://codeload.github.com/${REPO}/tar.gz/${value}`;
+  if (/^v?\d/.test(value)) return `https://codeload.github.com/${REPO}/tar.gz/refs/tags/${encodeURIComponent(value)}`;
+  return `https://codeload.github.com/${REPO}/tar.gz/refs/heads/${encodeURIComponent(value)}`;
 }
 
 function readStamp() {
@@ -167,9 +209,7 @@ function readStamp() {
 
 function writeStamp(value) {
   if (!value) return;
-  const fp = stampPath();
-  fs.mkdirSync(path.dirname(fp), { recursive: true });
-  fs.writeFileSync(fp, `${value}\n`, "utf8");
+  atomicWriteSync(stampPath(), `${value}\n`);
 }
 
 function sameRev(a, b) {
@@ -254,81 +294,31 @@ export function profilePluginDir(profileDir) {
   return fs.existsSync(nm) ? realPath(nm) : "";
 }
 
-function resolveDshBin() {
-  try {
-    execFileSync(process.platform === "win32" ? "where" : "which", ["dsh"], HIDDEN);
-    return "dsh";
-  } catch {
-    // 桌面进程 PATH 里经常没有 dsh，再到启动器旁找。
-  }
-  const home = findDshHome();
-  const names = process.platform === "win32" ? ["dsh.cmd", "dsh.exe", "dsh"] : ["dsh"];
-  const dirs = [
-    path.join(home, "..", "npm-global"),
-    path.join(home, "..", "npm-global-0.1.5-rc.2"),
-    path.join(home, "..", "npm-global-0.1.5-rc.1"),
-    path.join(home, "bin"),
-  ];
-  for (const dir of dirs) {
-    for (const name of names) {
-      const fp = path.join(dir, name);
-      if (fs.existsSync(fp)) return fp;
+/** 把 profile 里的安装地址改成 codeload。github.com/archive 会 302，pnpm 的 fetch 接着失败。 */
+function pinInstalledSpec(profileDir, ref) {
+  if (!profileDir) return;
+  const url = archiveTarballUrl(ref);
+  const pkgPath = path.join(profileDir, "package.json");
+  const pkg = readJson(pkgPath);
+  if (pkg) {
+    let changed = false;
+    for (const key of ["dependencies", "devDependencies", "optionalDependencies"]) {
+      if (pkg[key] && Object.prototype.hasOwnProperty.call(pkg[key], "dsh-purge") && pkg[key]["dsh-purge"] !== url) {
+        pkg[key]["dsh-purge"] = url;
+        changed = true;
+      }
     }
+    if (changed) atomicWriteSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
   }
-  return "";
-}
-
-export function runDshPlugin(profile, args) {
-  if (adapterFor(detectSurface()) === "desktop") {
-    const inv = cliInvocation();
-    if (!inv) throw new Error("找不到 DSH Desktop CLI");
-    execFileSync(inv.execPath, [...inv.argvPrefix, "plugin", "--profile", profile, ...args], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-      timeout: 120000,
-      env: {
-        ...process.env,
-        ...inv.env,
-        DSH_HOME: findDshHome(),
-        CI: "1",
-      },
-    });
-    return;
-  }
-  const bin = resolveDshBin();
-  if (!bin) throw new Error("找不到 dsh");
-  execFileSync(bin, ["plugin", "--profile", profile, ...args], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true,
-    timeout: 120000,
-    env: {
-      ...process.env,
-      DSH_HOME: findDshHome(),
-      CI: "1",
-    },
-  });
-}
-
-export function pluginAddSpec(spec, ref = currentChannelRef()) {
-  const s = String(spec || "");
-  if (/\.(zip|tgz|tar\.gz)(\b|$)/i.test(s) || /^https?:\/\//i.test(s)) return archiveTarballUrl(ref);
-  if (/^github:/i.test(s) || /github\.com\/.+\.git/i.test(s)) return githubSpec(ref);
-  return "";
-}
-
-function dshReinstall(profile, spec, ref = currentChannelRef()) {
-  const addSpec = pluginAddSpec(spec, ref);
-  if (addSpec) {
-    runDshPlugin(profile, ["add", "--force", addSpec]);
-    return;
-  }
-  try {
-    runDshPlugin(profile, ["update", "dsh-purge"]);
-  } catch {
-    runDshPlugin(profile, ["add", "--force", archiveTarballUrl(ref)]);
-  }
+  // 这里曾经用正则把 pnpm-lock.yaml 里 importer 的 specifier/version 两行换成新地址，
+  // 却没有写 packages:/snapshots: 条目。锁文件于是自相矛盾，pnpm 在任何命令之前校验
+  // 锁文件就失败：
+  //   ERR_PNPM_LOCKFILE_MISSING_DEPENDENCY / Broken lockfile: no entry for 'dsh-purge@…'
+  // dsh 又给子进程带 CI=1（frozen-lockfile 默认开），于是 profile 里连紧随其后、
+  // 本来能修好它的 pnpm add --force 都起不来 —— 整个 profile 从此不可安装。
+  // 这个手改并不需要：pin 完 package.json 后，pnpm 自己会在 add --force 时按新地址
+  // 重新解析，把 importer / packages / snapshots 一次写一致。锁文件只能由解析出这些
+  // 字段的解析器来写。
 }
 
 function planUpdates() {
@@ -350,7 +340,7 @@ function planUpdates() {
       continue;
     }
     const dir = profilePluginDir(p.dir) || PLUGIN_ROOT;
-    jobs.push({ kind: "dsh", profile: p.name, spec: p.spec, dir });
+    jobs.push({ kind: "dsh", profile: p.name, spec: p.spec, dir, profileDir: p.dir });
     remember(dir);
   }
 
@@ -376,32 +366,129 @@ function detectVia() {
 
 function isAbortError(e) {
   const msg = String((e && e.message) || e || "");
-  return (e && (e.name === "AbortError" || e.name === "TimeoutError")) || /aborted|abort/i.test(msg);
+  return (e && (e.name === "AbortError" || e.name === "TimeoutError")) || /aborted|abort|超时/i.test(msg);
+}
+
+function rewriteDownloadUrl(url) {
+  const value = String(url || "");
+  let match = value.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/archive\/refs\/(tags|heads)\/(.+)\.(zip|tar\.gz)$/i);
+  if (match) {
+    const kind = match[4].toLowerCase() === "zip" ? "zip" : "tar.gz";
+    return `https://codeload.github.com/${match[1]}/${kind}/refs/${match[2]}/${decodeURIComponent(match[3])}`;
+  }
+  match = value.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/archive\/([0-9a-f]{7,40})\.(zip|tar\.gz)$/i);
+  if (match) {
+    const kind = match[3].toLowerCase() === "zip" ? "zip" : "tar.gz";
+    return `https://codeload.github.com/${match[1]}/${kind}/${match[2]}`;
+  }
+  return "";
+}
+
+function requestBuffer(url, ms, headers, redirectsLeft = 5) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch (e) {
+      reject(e);
+      return;
+    }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      reject(new Error(`update: unsupported protocol ${parsed.protocol}`));
+      return;
+    }
+    const lib = parsed.protocol === "http:" ? http : https;
+    const req = lib.request(parsed, {
+      method: "GET",
+      headers: { "user-agent": "dsh-purge-update", accept: "*/*", ...headers },
+    }, (res) => {
+      const status = res.statusCode || 0;
+      if ([301, 302, 303, 307, 308].includes(status)) {
+        res.resume();
+        if (redirectsLeft <= 0) {
+          reject(new Error("http redirect loop"));
+          return;
+        }
+        const loc = Array.isArray(res.headers.location) ? res.headers.location[0] : res.headers.location;
+        const candidate = loc ? new URL(loc, url).href : rewriteDownloadUrl(url);
+        if (!candidate || candidate === url) {
+          reject(new Error(`http ${status}`));
+          return;
+        }
+        let nextUrl;
+        try {
+          nextUrl = new URL(candidate);
+        } catch (e) {
+          reject(e);
+          return;
+        }
+        if (nextUrl.protocol !== "https:") {
+          reject(new Error(`update: redirect rejected (non-https: ${nextUrl.protocol})`));
+          return;
+        }
+        if (!UPDATE_REDIRECT_ALLOWED_HOSTS.has(nextUrl.hostname)) {
+          reject(new Error(`update: redirect rejected (host not allowed: ${nextUrl.hostname})`));
+          return;
+        }
+        requestBuffer(nextUrl.href, ms, headers, redirectsLeft - 1).then(resolve, reject);
+        return;
+      }
+      if (status < 200 || status >= 300) {
+        res.resume();
+        const rewritten = rewriteDownloadUrl(url);
+        if (rewritten && rewritten !== url && redirectsLeft > 0) {
+          requestBuffer(rewritten, ms, headers, redirectsLeft - 1).then(resolve, reject);
+          return;
+        }
+        reject(new Error(`http ${status}`));
+        return;
+      }
+      const chunks = [];
+      let received = 0;
+      let aborted = false;
+      res.on("data", (chunk) => {
+        if (aborted) return;
+        received += chunk.length;
+        if (received > MAX_UPDATE_BYTES) {
+          aborted = true;
+          req.destroy(new Error(`update: response exceeds ${MAX_UPDATE_BYTES} bytes`));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      res.on("end", () => {
+        if (!aborted) resolve({ status, body: Buffer.concat(chunks) });
+      });
+      res.on("error", reject);
+    });
+    req.on("error", reject);
+    req.setTimeout(ms, () => {
+      req.destroy(new Error("GitHub 超时"));
+    });
+    req.end();
+  });
 }
 
 async function fetchRes(url, ms = 20000, headers = {}) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => {
-    try {
-      ctrl.abort("timeout");
-    } catch {
-      ctrl.abort();
-    }
-  }, ms);
+  const started = rewriteDownloadUrl(url) || url;
   try {
-    const res = await fetch(url, {
-      headers: { "user-agent": "dsh-purge-update", accept: "*/*", ...headers },
-      redirect: "follow",
-      cache: "no-store",
-      signal: ctrl.signal,
-    });
-    if (!res.ok) throw new Error(`http ${res.status}`);
-    return res;
+    const result = await requestBuffer(started, ms, headers);
+    return {
+      ok: true,
+      status: result.status,
+      async text() {
+        return result.body.toString("utf8");
+      },
+      async arrayBuffer() {
+        return result.body.buffer.slice(
+          result.body.byteOffset,
+          result.body.byteOffset + result.body.byteLength,
+        );
+      },
+    };
   } catch (e) {
-    if (isAbortError(e)) throw new Error("GitHub 超时");
+    if (isAbortError(e) || /GitHub 超时/.test(String(e && e.message))) throw new Error("GitHub 超时");
     throw e;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -418,8 +505,15 @@ function versionFromPackageText(text) {
   return pkg && pkg.version ? String(pkg.version) : "";
 }
 
+// 远端 package.json 版本号查询:5 分钟 memo,频繁刷新面板时不重复打 raw.github / jsdelivr。
+const _remotePkgVerCache = new Map();
+const REMOTE_PKG_VER_TTL = 300_000;
 async function remotePackageVersion(sha = "", fallbackRef = STABLE_REF) {
   const ref = sha || fallbackRef;
+  const key = sha || `ref:${ref}`;
+  const now = Date.now();
+  const hit = _remotePkgVerCache.get(key);
+  if (hit && now - hit.at < REMOTE_PKG_VER_TTL) return hit.value;
   const urls = [
     sha ? `https://cdn.jsdelivr.net/gh/${REPO}@${sha}/package.json` : "",
     `https://raw.githubusercontent.com/${REPO}/${ref}/package.json`,
@@ -430,19 +524,23 @@ async function remotePackageVersion(sha = "", fallbackRef = STABLE_REF) {
     try {
       if (url.includes("api.github.com/repos/")) {
         const data = await fetchJson(url, 20000, { accept: "application/vnd.github.raw" });
-        if (typeof data === "string") return versionFromPackageText(data);
-        if (data && data.version) return String(data.version);
-        if (data && data.content && data.encoding === "base64") {
-          return versionFromPackageText(Buffer.from(data.content.replace(/\s/g, ""), "base64").toString("utf8"));
+        let ver = "";
+        if (typeof data === "string") ver = versionFromPackageText(data);
+        else if (data && data.version) ver = String(data.version);
+        else if (data && data.content && data.encoding === "base64") {
+          ver = versionFromPackageText(Buffer.from(data.content.replace(/\s/g, ""), "base64").toString("utf8"));
         }
+        if (ver) { _remotePkgVerCache.set(key, { value: ver, at: now }); return ver; }
         continue;
       }
       const ver = versionFromPackageText(await fetchText(url));
-      if (ver) return ver;
+      if (ver) { _remotePkgVerCache.set(key, { value: ver, at: now }); return ver; }
     } catch {
       // 换下一个源。
     }
   }
+  // 失败也记短缓存 30 秒,避免反复打空请求。
+  _remotePkgVerCache.set(key, { value: "", at: now - (REMOTE_PKG_VER_TTL - 30_000) });
   return "";
 }
 
@@ -475,16 +573,38 @@ function rememberVersion(item, seen) {
   return item;
 }
 
-function markCurrent(versions, state, localVer, localSha) {
-  return (versions || []).map((item) => ({
+const UPDATE_REF_RE = /^(?:v?\d+\.\d+(?:\.\d+)?(?:-[\w.]+)?|master|main|beta|[0-9a-f]{7,40})$/i;
+
+export function safeUpdateRef(ref) {
+  const target = String(ref || "").trim();
+  if (!target) return "";
+  if (!UPDATE_REF_RE.test(target)) return "";
+  return target;
+}
+
+export function markCurrent(versions, state, localVer, localSha) {
+  const pin = String(state?.pin || "");
+  const rows = versions || [];
+  const ver = String(localVer || "").replace(/^v/i, "");
+  const channel = state?.channel || "stable";
+  const sameVersion = (item) => ver && String(item?.version || "").replace(/^v/i, "") === ver && item.channel === channel;
+  const sameSha = (item) => Boolean(localSha && item?.sha && sameRev(localSha, item.sha));
+  let chosen = null;
+  if (pin) {
+    chosen = rows.find((item) => item.ref === pin) || null;
+  } else {
+    const pool = rows.filter(sameVersion);
+    // 安装记录里的旧提交号不能把较低版本标成当前。只认和正在跑的 package.json 相同的版本。
+    chosen = pool.find((item) => sameSha(item) && (item.latest || item.ref === "master" || item.kind === "head"))
+      || pool.find((item) => item.latest || item.ref === "master" || item.kind === "head")
+      || pool.find((item) => sameSha(item))
+      || pool[0]
+      || null;
+  }
+  return rows.map((item) => ({
     ...item,
     shaShort: item.shaShort || (item.sha ? String(item.sha).slice(0, 7) : ""),
-    current: Boolean(
-      (localSha && item.sha && sameRev(localSha, item.sha))
-      || (state.pin && item.ref === state.pin)
-      || (!state.pin && item.latest && item.channel === state.channel && item.version && item.version === localVer)
-      || (!state.pin && item.version && item.version === localVer && item.channel === (isBetaName(localVer) ? "beta" : "stable")),
-    ),
+    current: Boolean(chosen && item === chosen),
   }));
 }
 
@@ -510,6 +630,25 @@ async function listGithubTags() {
   } catch {
     return [];
   }
+}
+
+function ensureRunningVersion(versions, state, localVer, localSha) {
+  const ver = String(localVer || "").replace(/^v/i, "");
+  if (!ver || isBetaName(ver) || state?.channel === "beta") return versions;
+  if ((versions || []).some((item) => item.channel === "stable" && String(item.version || "").replace(/^v/i, "") === ver)) {
+    return versions;
+  }
+  const ref = (versions || []).some((item) => item.ref === "master") ? `local-${ver}` : "master";
+  return [{
+    id: ref,
+    ref,
+    sha: localSha || "",
+    version: ver,
+    channel: "stable",
+    label: versionLabel(ver, "stable", localSha),
+    kind: "local",
+    latest: !(versions || []).some((item) => item.channel === "stable" && item.latest),
+  }, ...(versions || [])];
 }
 
 async function listRemoteVersions() {
@@ -567,27 +706,18 @@ async function listRemoteVersions() {
 
   const localVer = localVersion();
   const localSha = (gitOk() ? gitHead(PLUGIN_ROOT) : "") || readStamp();
+  const withLocal = ensureRunningVersion(out, state, localVer, localSha);
+  const ceiling = latestStableVersion([
+    ...withLocal,
+    localVer && !isBetaName(localVer) ? { channel: "stable", version: localVer } : null,
+  ].filter(Boolean));
+  const visible = withLocal.filter((item) => !hideListedVersion(item, ceiling));
   return {
-    versions: markCurrent(out.filter((item) => !withdrawnVersion(item)), state, localVer, localSha),
-    hasBeta: Boolean(betaSha || out.some((item) => item.channel === "beta" && item.kind === "tag")),
+    versions: markCurrent(visible, state, localVer, localSha),
+    hasBeta: Boolean(betaSha),
     stableSha,
-    betaSha,
+    betaSha: betaSha || "",
   };
-}
-
-function alignChannelState(state, listed, localRev, localVer) {
-  if (state.pin) return state;
-  if (listed.betaSha && localRev && sameRev(localRev, listed.betaSha) && state.channel !== "beta") {
-    return writeChannelState({ channel: "beta", pin: "" });
-  }
-  if (listed.stableSha && localRev && sameRev(localRev, listed.stableSha) && state.channel !== "stable") {
-    return writeChannelState({ channel: "stable", pin: "" });
-  }
-  if (!localRev && localVer) {
-    const inferred = isBetaName(localVer) ? "beta" : "stable";
-    if (inferred !== state.channel) return writeChannelState({ channel: inferred, pin: "" });
-  }
-  return state;
 }
 
 function describeLane(id, listed, state, localVer, localRev) {
@@ -597,14 +727,14 @@ function describeLane(id, listed, state, localVer, localRev) {
   const version = latest?.version || "";
   const onLane = state.channel === id;
   const matchesHead = Boolean(localRev && sha && sameRev(localRev, sha));
-  const current = versions.some((item) => item.current) || matchesHead
-    || Boolean(onLane && version && localVer && version === localVer && !state.pin);
+  const current = matchesHead || versions.some((item) => item.current && (item.latest || (state.pin && item.ref === state.pin)));
   let hasUpdate = false;
   if (onLane && state.pin) {
     hasUpdate = Boolean(sha && localRev && !sameRev(localRev, sha));
-  } else if (onLane && sha && localRev) {
-    hasUpdate = !sameRev(localRev, sha) || versionIsNewer(version, localVer);
   } else if (onLane && versionIsNewer(version, localVer)) {
+    // 只跟版本号。提交号对不上就再 add --force，会在 dsh 杀掉宿主后形成无限重启。
+    hasUpdate = true;
+  } else if (onLane && !localVer && sha && localRev && !sameRev(localRev, sha)) {
     hasUpdate = true;
   }
   return {
@@ -632,7 +762,6 @@ export async function checkUpdate() {
   const gitSha = gitOk() ? gitHead(PLUGIN_ROOT) : "";
   const stamp = readStamp();
   const localRev = gitSha || stamp;
-  state = alignChannelState(state, listed, localRev, localVer);
   listed.versions = markCurrent(listed.versions, state, localVer, localRev);
   const channelRef = currentChannelRef(state);
   const lanes = lanesOf(listed, state, localVer, localRev);
@@ -716,7 +845,8 @@ function gitResetTo(dir, ref, { force = false } = {}) {
   if (!force && gitTrackedDirty(dir)) {
     throw new Error("本地插件文件有未提交改动，未覆盖");
   }
-  const target = String(ref || STABLE_REF);
+  const target = safeUpdateRef(ref || STABLE_REF);
+  if (!target) throw new Error("未知版本");
   try {
     runGit(dir, ["fetch", "origin", "--tags"], 60000);
   } catch {
@@ -740,67 +870,117 @@ function gitResetTo(dir, ref, { force = false } = {}) {
 }
 
 function extractZip(zip, dest) {
-  try {
-    execFileSync("tar", ["-xf", zip, "-C", dest], { ...HIDDEN, timeout: 60000 });
-    return;
-  } catch {
-    // Windows 10+ 自带 tar；没有或失败时改 PowerShell。
-  }
-  execFileSync(
-    "powershell",
-    ["-NoProfile", "-Command", "Expand-Archive -LiteralPath $env:DSH_UPD_ZIP -DestinationPath $env:DSH_UPD_DIR -Force"],
-    {
-      ...HIDDEN,
-      timeout: 60000,
-      env: { ...process.env, DSH_UPD_ZIP: zip, DSH_UPD_DIR: dest },
-    },
-  );
+  // win32：tar(bsdtar) → powershell。darwin/linux：tar → unzip → python3 → bsdtar。
+  // 外部工具都不可用时用 Node 解 zip，Linux 不会再去调用 powershell。
+  extractZipArchive(zip, dest);
 }
 
 async function overlayFromZip(dests, ref = STABLE_REF) {
   const unique = [...new Set(dests.filter(Boolean).map((d) => realPath(d)))];
   if (!unique.length) return;
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "dsh-purge-upd-"));
-  const zip = path.join(tmp, "plugin.zip");
-  const res = await fetchRes(archiveZipUrl(ref), 45000);
-  await fsp.writeFile(zip, Buffer.from(await res.arrayBuffer()));
-  extractZip(zip, tmp);
-  const names = await fsp.readdir(tmp);
-  const unpacked = names
-    .map((n) => path.join(tmp, n))
-    .find((p) => fs.existsSync(path.join(p, "package.json")));
-  if (!unpacked) throw new Error("zip 里没有 package.json");
-  for (const dest of unique) {
-    for (const name of COPY_NAMES) {
-      const from = path.join(unpacked, name);
-      const to = path.join(dest, name);
-      if (!fs.existsSync(from)) continue;
-      if (name === "lib" || name === "docs" || name === "bin") {
-        try {
-          await fsp.rm(to, { recursive: true, force: true });
-        } catch {
-          // 目录被占用时改为覆盖写入。
-        }
-      }
-      await fsp.cp(from, to, { recursive: true, force: true });
-    }
-  }
   try {
-    await fsp.rm(tmp, { recursive: true, force: true });
-  } catch {
-    // 临时目录清不掉不影响安装结果。
+    const zip = path.join(tmp, "plugin.zip");
+    const res = await fetchRes(archiveZipUrl(ref), 45000);
+    await fsp.writeFile(zip, Buffer.from(await res.arrayBuffer()));
+    extractZip(zip, tmp);
+    const names = await fsp.readdir(tmp);
+    const unpacked = names
+      .map((n) => path.join(tmp, n))
+      .find((p) => fs.existsSync(path.join(p, "package.json")));
+    if (!unpacked) throw new Error("zip 里没有 package.json");
+    for (const dest of unique) {
+      for (const name of COPY_NAMES) {
+        const from = path.join(unpacked, name);
+        const to = path.join(dest, name);
+        if (!fs.existsSync(from)) continue;
+        if (name === "lib" || name === "docs" || name === "bin") {
+          try {
+            await fsp.rm(to, { recursive: true, force: true });
+          } catch (e) {
+            // 删不掉说明文件被进程占用。继续 cp 会写出一半新文件一半旧文件的半升级,
+            // 让 host 和插件的版本不一致。宁可抛错让用户彻底退出宿主再重试。
+            throw new Error(
+              `覆盖 ${to} 失败(${e.message || e})。可能被进程占用,请完全退出宿主后重试。`,
+            );
+          }
+        }
+        await fsp.cp(from, to, { recursive: true, force: true });
+      }
+    }
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
   }
 }
 
+function parseReapplyOutput(text) {
+  const line = String(text || "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter((item) => item.startsWith("{"))
+    .pop();
+  if (!line) return null;
+  try {
+    return JSON.parse(line);
+  } catch {
+    return null;
+  }
+}
+
+/** 用刚写好的插件文件在新进程里还原并重打，避免还在跑旧补丁列表。 */
+function runReapplyChild() {
+  const cli = path.join(PLUGIN_ROOT, "lib", "reapply-cli.js");
+  if (!fs.existsSync(cli)) return { ok: false, error: "缺少重新应用脚本" };
+  const env = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
+  delete env.DSH_PURGE_RESTART;
+  let run;
+  try {
+    run = spawnSync(process.execPath, ["--expose-internals", cli], {
+      cwd: PLUGIN_ROOT,
+      env,
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 180000,
+      maxBuffer: 8 * 1024 * 1024,
+    });
+  } catch (e) {
+    return { ok: false, error: String(e && e.message ? e.message : e) };
+  }
+  const parsed = parseReapplyOutput(`${run.stdout || ""}\n${run.stderr || ""}`);
+  if (parsed) return parsed;
+  const detail = String(run.stderr || run.stdout || (run.error && run.error.message) || "重新应用失败").trim();
+  return { ok: false, error: detail.slice(0, 500) || "重新应用失败" };
+}
+
+let applyUpdateInflight = null;
+
 export async function applyUpdate(jobs = planUpdates(), options = {}) {
+  // 同一时刻只能有一次 applyUpdate 在跑。第二次调用在第一次完成前共享同一个 Promise,
+  // 避免两条 overlayFromZip 同时往同一目录写出一半文件,或两次 writeStamp 竞争。
+  if (applyUpdateInflight) return applyUpdateInflight;
+  applyUpdateInflight = (async () => {
+    try {
+      return await _applyUpdateImpl(jobs, options);
+    } finally {
+      applyUpdateInflight = null;
+    }
+  })();
+  return applyUpdateInflight;
+}
+
+async function _applyUpdateImpl(jobs, options) {
   if (!Array.isArray(jobs)) {
     options = jobs && typeof jobs === "object" ? jobs : {};
     jobs = planUpdates();
   }
   const state = readChannelState();
-  const ref = String(options.ref || currentChannelRef(state) || STABLE_REF);
+  const ref = safeUpdateRef(options.ref || currentChannelRef(state) || STABLE_REF);
+  if (!ref) throw new Error("未知版本");
   const force = options.force !== false;
+  const pin = options.pin === false ? "" : (options.pin || state.pin || "");
+  const channel = normalizeChannel(options.channel || state.channel);
   const zipDirs = [];
+  const specProfiles = [];
   const vias = new Set();
   for (const job of jobs) {
     if (job.kind === "git") {
@@ -815,47 +995,45 @@ export async function applyUpdate(jobs = planUpdates(), options = {}) {
       continue;
     }
     if (job.kind === "dsh") {
-      try {
-        dshReinstall(job.profile, job.spec, ref);
-        vias.add("dsh");
-        continue;
-      } catch {
-        zipDirs.push(job.dir);
-      }
-    } else {
-      zipDirs.push(job.dir);
+      // exe 和 web 都走 dsh plugin add → pnpm。pnpm 拉 GitHub 包会 302 或 fetch failed，
+      // 而且 add --force 会先杀掉宿主。这里改为自己下载再覆盖。
+      if (job.dir) zipDirs.push(job.dir);
+      if (job.profileDir) specProfiles.push(job.profileDir);
+      continue;
     }
+    zipDirs.push(job.dir);
   }
   if (zipDirs.length) {
     await overlayFromZip(zipDirs, ref);
     vias.add("zip");
   }
+  for (const dir of specProfiles) pinInstalledSpec(dir, ref);
   const sha = (gitOk() ? gitHead(PLUGIN_ROOT) : "") || (await remoteHeadSha(ref).catch(() => ""));
-  if (sha) writeStamp(sha);
   const via = vias.size > 1 ? "mixed" : [...vias][0] || detectVia();
-  const pin = options.pin === false ? "" : (options.pin || state.pin || "");
-  const channel = normalizeChannel(options.channel || state.channel);
   const saved = writeChannelState({ channel, pin });
   const localVer = localVersion();
-  pushHistory({
-    ref,
-    sha: sha || "",
-    version: localVer,
-    channel,
-    label: versionLabel(localVer, channel, sha),
-    at: new Date().toISOString(),
-  });
-  const prev = lastUpdateResult() || {};
-  const listed = {
-    versions: Array.isArray(prev.versions) ? prev.versions : [],
-    hasBeta: prev.hasBeta !== false,
-    stableSha: prev.stableSha || "",
-    betaSha: prev.betaSha || "",
-  };
+  const listed = await listRemoteVersions().catch(() => ({ versions: [], hasBeta: saved.channel === "beta" }));
+  const reapplied = runReapplyChild();
+  // reapply 真的成功才能承认这次升级：写 stamp / guard / history。
+  // 失败就不写,下次 checkUpdate 还能发现没完成的升级,而不是误标为"已是最新"。
+  if (reapplied.ok === true) {
+    if (sha) markAutoUpdateGuard(ref, sha);
+    if (sha) writeStamp(sha);
+    pushHistory({
+      ref,
+      sha: sha || "",
+      version: localVer,
+      channel,
+      label: versionLabel(localVer, channel, sha),
+      at: new Date().toISOString(),
+    });
+  }
+  const restartAfter = reapplied.ok === true && !reapplied.needsFullQuit;
+  const needsFullQuit = reapplied.ok === true && Boolean(reapplied.needsFullQuit);
   return rememberUpdate({
-    ok: true,
-    applied: true,
-    hasUpdate: false,
+    ok: reapplied.ok !== false,
+    applied: reapplied.ok === true,
+    hasUpdate: reapplied.ok !== true,
     hasBeta: listed.hasBeta,
     pinned: Boolean(saved.pin),
     localVersion: localVer,
@@ -863,7 +1041,12 @@ export async function applyUpdate(jobs = planUpdates(), options = {}) {
     localSha: sha ? String(sha).slice(0, 7) : "",
     remoteSha: sha ? String(sha).slice(0, 7) : "",
     needRestart: false,
-    reloadClient: true,
+    reloadClient: !restartAfter && !needsFullQuit,
+    restartAfter,
+    needsFullQuit,
+    reapplied: reapplied.ok === true,
+    needsRetry: reapplied.ok === false,
+    error: reapplied.ok === false ? `文件已更新，但还原并重新应用失败: ${reapplied.error || "未知错误"}` : undefined,
     via,
     versions: listed.versions,
     lanes: lanesOf(listed, saved, localVer, sha),
@@ -873,24 +1056,6 @@ export async function applyUpdate(jobs = planUpdates(), options = {}) {
 
 export async function switchChannel(channel, { apply = true } = {}) {
   const next = normalizeChannel(channel);
-  if (next === "beta") {
-    const betaSha = await remoteHeadSha(BETA_REF);
-    if (!betaSha) {
-      const tags = await listGithubTags();
-      const tag = tags.find((item) => item.channel === "beta");
-      if (!tag) {
-        return rememberUpdate({
-          ok: false,
-          error: "还没有测试版",
-          hasBeta: false,
-          ...channelPublic(),
-          versions: [],
-          lanes: { stable: { id: "stable", hasRemote: true }, beta: { id: "beta", hasRemote: false } },
-        });
-      }
-      if (apply) return applyUpdate(planUpdates(), { ref: tag.ref, channel: "beta", pin: false, force: true });
-    }
-  }
   if (!apply) {
     writeChannelState({ channel: next, pin: "" });
     return checkUpdate();
@@ -898,14 +1063,27 @@ export async function switchChannel(channel, { apply = true } = {}) {
   return applyUpdate(planUpdates(), { ref: CHANNELS[next].ref, channel: next, pin: false, force: true });
 }
 
+function listedUpdateRef(target, listed) {
+  const safe = safeUpdateRef(target);
+  if (!safe) return "";
+  const hit = (listed?.versions || []).find((item) => (
+    item.ref === safe
+    || item.id === safe
+    || item.sha === safe
+    || (item.sha && safe.length >= 7 && (item.sha.startsWith(safe) || safe.startsWith(item.sha)))
+  ));
+  return safeUpdateRef(hit?.ref || "");
+}
+
 export async function switchVersion(ref) {
-  const target = String(ref || "").trim();
+  const raw = String(ref || "").trim();
+  if (withdrawnVersion({ ref: raw, version: raw })) throw new Error("该版本已下线");
+  const target = safeUpdateRef(raw);
   if (!target) throw new Error("请选择要回退的版本");
-  if (withdrawnVersion({ ref: target, version: target })) throw new Error("该版本已下线");
   const listed = await listRemoteVersions();
-  const hit = listed.versions.find((item) => item.ref === target || item.id === target || item.version === target || item.sha === target);
-  if (hit && withdrawnVersion(hit)) throw new Error("该版本已下线");
-  const resolved = hit?.ref || target;
+  const resolved = listedUpdateRef(target, listed);
+  if (!resolved) throw new Error("未知版本");
+  const hit = listed.versions.find((item) => item.ref === resolved);
   const channel = hit?.channel || readChannelState().channel;
   const pin = hit?.latest ? "" : resolved;
   return applyUpdate(planUpdates(), { ref: resolved, channel, pin, force: true });
@@ -918,44 +1096,25 @@ export async function handleUpdateOp(body = {}) {
   if (op === "switch" || op === "rollback") return switchVersion(body.ref || body.version || body.id);
   if (op === "auto") return autoUpdateIfNeeded();
   const state = readChannelState();
-  const ref = body.ref || currentChannelRef(state);
-  const channel = body.channel || (ref === BETA_REF ? "beta" : ref === STABLE_REF ? "stable" : state.channel);
+  const requested = body.ref || currentChannelRef(state);
+  const ref = safeUpdateRef(requested);
+  if (!ref) throw new Error("未知版本");
+  if (ref !== BETA_REF && isBetaName(ref)) throw new Error("该测试标签已不再提供");
+  if (ref !== STABLE_REF && ref !== BETA_REF) {
+    const listed = await listRemoteVersions();
+    if (!listedUpdateRef(ref, listed)) throw new Error("未知版本");
+  }
+  const channel = ref === BETA_REF ? "beta" : (ref === STABLE_REF ? "stable" : normalizeChannel(body.channel || state.channel));
   return applyUpdate(planUpdates(), { ref, channel, pin: false, force: true });
 }
 
 export async function autoUpdateIfNeeded() {
-  try {
-    const check = await checkUpdate();
-    if (check.pinned) return rememberUpdate({ ...check, auto: true, skipped: "pinned" });
-    if (!check.hasUpdate) return rememberUpdate({ ...check, auto: true, skipped: "latest" });
-    if (check.updateTarget === BETA_REF && readChannelState().channel !== "beta") {
-      return rememberUpdate({ ...check, auto: true, skipped: "beta" });
-    }
-    const jobs = planUpdates();
-    const dirtyGit = jobs.filter((j) => j.kind === "git" && gitTrackedDirty(j.dir));
-    const runnable = jobs.filter((j) => !(j.kind === "git" && gitTrackedDirty(j.dir)));
-    if (!runnable.length && dirtyGit.length) {
-      return rememberUpdate({
-        ...check,
-        auto: true,
-        skipped: "dirty",
-        error: "本地插件文件有未提交改动，未自动覆盖",
-      });
-    }
-    const applied = await applyUpdate(runnable, {
-      ref: currentChannelRef(),
-      channel: readChannelState().channel,
-      pin: false,
-      force: false,
-    });
-    return rememberUpdate({ ...applied, auto: true });
-  } catch (e) {
-    return rememberUpdate({
-      ok: false,
-      auto: true,
-      hasUpdate: false,
-      error: String(e && e.message ? e.message : e),
-      ...channelPublic(),
-    });
-  }
+  // 插件只允许用户在面板手动更新；启动路径永不自动升（版本适配依赖本机宿主）。
+  return rememberUpdate({
+    auto: true,
+    skipped: "manual-only",
+    hasUpdate: false,
+    error: "",
+    ...channelPublic(),
+  });
 }

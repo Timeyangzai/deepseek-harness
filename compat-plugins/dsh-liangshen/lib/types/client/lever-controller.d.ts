@@ -3,7 +3,7 @@
  *
  * The view stays pure; every fact and verb comes from here. The roster arrives
  * over the agent-preset Remote namespace (the same one the official surfaces
- * read), the current session comes from the browser sessions service, and the
+ * read), the main-view session comes from the catalog's ownership marker, and the
  * switch goes through `agentPresets.select`, which the host accepts only while
  * the session is still blank.
  *
@@ -14,7 +14,7 @@
  * default.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis';
-import type { AgentPresetRoster } from '@deepseek-ai/dsh-agent-presets/types';
+import type { AgentPresetRoster } from '@deepseek-ai/dsh-agent-preset-registry/types';
 import type { RemoteResult } from '@deepseek-ai/dsh-api-remotes/client';
 import { type SnapshotStore } from '@deepseek-ai/dsh-client-store';
 import { type LeverState } from '../core/lever.ts';
@@ -47,6 +47,14 @@ export type LeverError =
 };
 /** How long one preset switch may stay in flight before it is reported as timed out. */
 export declare const SELECT_TIMEOUT_MS = 10000;
+/**
+ * Settings entry ids whose writes can move the roster this lever reads: the
+ * agent-preset registry's own entry (its default and selection policy) and this
+ * plugin's row under either install shape — the aggregate's generated row id
+ * and the standalone row id — because disabling the plugin unregisters the
+ * preset it declares.
+ */
+export declare const ROSTER_SETTINGS_ENTRY_IDS: readonly string[];
 /** What the lever view renders. */
 export interface LeverSnapshot {
     /** Resolved lever state. */
@@ -119,6 +127,12 @@ export declare class LeverController {
     refresh(): void;
     /** The verb behind one gesture direction. */
     private toggle;
+    /**
+     * Try to detect the active preset from the DOM hero chip or storage
+     * when session.projectionValues.agentPreset is absent.
+     */
+    private detectPreset;
+    private rememberPrevious;
     /** The facts one decision reads, from the live session and the roster. */
     private facts;
     private currentSessionId;

@@ -1,0 +1,21 @@
+{
+  "name": "dsh-profile-desktop",
+  "private": true,
+  "dependencies": {
+    "@jiesou/dsh-opencode-zen-free-provider": "0.1.23",
+    "@linxin666/dsh-liangshen": "file:../../local-plugins/dsh-liangshen",
+    "dsh-purge": "file:../../local-plugins/dsh-purge"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "dsh-purge",
+        "@deepseek-ai/dsh-experimental-agent-team-profile",
+        "@linxin666/dsh-liangshen",
+        "@jiesou/dsh-opencode-zen-free-provider"
+      ]
+    }
+  }
+}

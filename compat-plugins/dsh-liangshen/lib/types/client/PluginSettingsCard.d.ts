@@ -24,6 +24,13 @@ export interface PluginSettingsCardProps<TKey extends string = string> {
     descriptionKey: TKey;
     /** Optional rich header description rendered instead of the plain t(descriptionKey) text (the plain text stays as the tooltip). */
     descriptionNode?: ReactNode;
+    /**
+     * Optional leading mark identifying the plugin. A card without one keeps the
+     * plain official header shape, so the chrome stays a readable sibling of the
+     * built-in PluginCard wherever a family plugin lands in the official bundle
+     * seat.
+     */
+    icon?: ReactNode;
     /** The card's form state: availability, writability, and what a save would do. */
     state: CardShell;
     /** Write every staged edit. */
@@ -47,6 +54,10 @@ export interface PluginSettingsCardProps<TKey extends string = string> {
      * edits, so the footer would sit there permanently disabled.
      */
     hideFooter?: boolean;
+    /** Render children even when the settings namespace is not exposed by the host. */
+    renderChildrenWhenNotExposed?: boolean;
+    /** Hide the 'not exposed' warning banner when the settings namespace is not exposed. */
+    hideNotExposedNotice?: boolean;
     /** The plugin's controls. */
     children: ReactNode;
 }

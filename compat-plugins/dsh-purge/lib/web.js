@@ -68,7 +68,14 @@ function spawnRestartHelper(helper, payload, exitAfter = 250) {
   setTimeout(() => process.exit(0), exitAfter);
 }
 
-export function scheduleRestart(request) {
+/**
+ * @param {object} [request]
+ * @param {unknown} [_ctx]
+ * @param {{ openBrowser?: boolean }} [options]
+ * settle / 自愈重启传 request=null → 默认不弹浏览器，避免关窗后仍被反复拉起新窗口（#59/#61）。
+ */
+export function scheduleRestart(request, _ctx, options = {}) {
+  const openBrowser = options.openBrowser ?? (request != null);
   const helper = fileURLToPath(new URL("./restart-web.js", import.meta.url));
   spawnRestartHelper(helper, {
     kind: "web",
@@ -77,6 +84,8 @@ export function scheduleRestart(request) {
     cwd: process.cwd(),
     host: hostFromRequest(request),
     port: portFromRequest(request),
+    pid: process.pid,
+    openBrowser: openBrowser !== false,
   });
 }
 
@@ -93,5 +102,6 @@ export function scheduleCleanupRestart({ request, restartArgv: argv, cleanup = [
     port: portFromRequest(request),
     cleanup,
     helper: dest,
+    openBrowser: request != null,
   }, 400);
 }

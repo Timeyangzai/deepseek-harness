@@ -1,33 +1,54 @@
 /**
- * LiangShen settings card: availability and the wire presentation. Registers
- * into the `web-ui.plugin.item` child slot the Web UI plugin group renders,
- * bound to the `dsh-liangshen` namespace.
+ * LiangShen settings card: availability, the wire presentation, and the
+ * dispatcher identity. Registers into the `web-ui.plugin.item` child slot the
+ * Web UI plugin group renders, bound to the `liangshen` settings namespace
+ * (the Host profile entry id).
  *
- * The presentation field does not act on this client half: the Host writes it
- * into the synced preset composition, so a session reads it from its preset.
- * This card is the operator's only handle on it, which is why every field the
- * Host schema carries appears here.
+ * No field acts on this client half: the Host applies the presentation and the
+ * dispatcher switch to the preset it declares to the agent-preset registry, so
+ * a session reads both from its preset. The card is the operator's only handle
+ * on them, which is why every field the Host schema carries appears here.
  */
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store';
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
+import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client';
 import { type CardActions, type CardShell, type FieldState as CardFieldState } from './settings-form.ts';
 /** Wire presentations the tool catalog accepts (mirrors the Host schema). */
 export declare const PRESENTATION_CHOICES: readonly ["ptc", "native", "both"];
+/** Sensitivity presets for the circuit breaker (mirrors the Host schema). */
+export declare const SENSITIVITY_CHOICES: readonly ["conservative", "balanced", "aggressive"];
 /** The LiangShen fields this card edits (the namespace's full schema). */
 export interface LiangShenSettings {
     /** Master switch for the plugin. */
     enabled?: boolean;
     /** Whether the plugin announces itself in every agent's system prompt. */
     announceToAgent?: boolean;
-    /** Wire presentation written into the synced preset. */
+    /** Wire presentation the Host applies to the preset's tool-catalog row. */
     presentation?: string;
+    /** Whether the preset appends the dispatcher rules section after the persona. */
+    dispatcher?: boolean;
+    /** Master switch for the runtime degeneration circuit breaker. */
+    guardEnabled?: boolean;
+    /** Sensitivity preset scaling the breaker's adaptive thresholds. */
+    guardSensitivity?: string;
+    /** Per-step reasoning-character floor for the breaker's runaway ladder. */
+    guardStallReasoningChars?: number;
+    /** Consecutive output-free reasoning steps for the breaker's slow-burn ladder. */
+    guardGlobalStallCap?: number;
+    /** Identical-argument tool failures for the breaker's echo ladder. */
+    guardEchoFailures?: number;
 }
 /** What the LiangShen card renders. */
 export interface LiangShenSettingsCardState extends CardShell {
     enabled: CardFieldState;
     announceToAgent: CardFieldState;
     presentation: CardFieldState;
+    dispatcher: CardFieldState;
+    guardEnabled: CardFieldState;
+    guardSensitivity: CardFieldState;
+    guardStallReasoningChars: CardFieldState;
+    guardGlobalStallCap: CardFieldState;
+    guardEchoFailures: CardFieldState;
 }
 /** The registration-side face the card's slot entry injects. */
 export interface LiangShenSettingsCardFace extends CardActions {
@@ -36,12 +57,12 @@ export interface LiangShenSettingsCardFace extends CardActions {
         liangShenSettingsCard: SnapshotStore<LiangShenSettingsCardState>;
     };
 }
-/** Bridges the `dsh-liangshen` scope onto the card's staged form. */
+/** Bridges the `liangshen` settings form onto the card's staged form. */
 export declare class LiangShenSettingsCardController {
     private readonly form;
     private readonly store;
-    /** @param scope - the bound settings scope for the `dsh-liangshen` namespace. */
-    constructor(scope: SettingsScope<LiangShenSettings>);
+    /** @param scope - the bound configuration form of the entry that owns this namespace. */
+    constructor(scope: ConfigForm<LiangShenSettings>);
     private projection;
     /**
      * Build the face the card's slot registration injects.

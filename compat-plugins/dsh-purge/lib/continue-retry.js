@@ -1,4 +1,3 @@
-import { promises as fsp } from "node:fs";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -6,7 +5,9 @@ import { randomUUID } from "node:crypto";
 export const DEFAULT_CONTINUE_RETRY = Object.freeze({
   autoRetry: true,
   retryMax: 3,
-  autoContinue: true,
+  // [dsh-purge] 二轮立刻发被拒根因之一:idle 后 280ms 自动续跑与用户 submit 竞态。
+  // 关自动续跑,只保留 autoRetry(request-error 自动重试)。
+  autoContinue: false,
   continueMax: 3,
   continueText: "继续",
 });
@@ -18,10 +19,22 @@ const PERMANENT_CODES = new Set([
   "INVALID",
   "INVALID_REQUEST",
   "QUOTA",
+  "ACCOUNT_QUOTA",
   "BILLING",
   "MODEL_NOT_FOUND",
   "CONTEXT_OVERFLOW",
   "CONTEXT_LENGTH",
+  "CONTEXT_WINDOW_EXCEEDED",
+  "NO_ADAPTER",
+  "MISSING_CREDENTIAL",
+  "INVALID_CREDENTIAL",
+]);
+
+/** Official already retried these; a new "继续" turn cannot clear them. */
+const NO_CONTINUE_CODES = new Set([
+  ...PERMANENT_CODES,
+  "RATE_LIMIT",
+  "TRANSPORT",
 ]);
 
 const ABNORMAL_KINDS = new Set(["error", "aborted", "interrupted", "max-tokens"]);
@@ -61,14 +74,6 @@ export function loadSettings(dshHome) {
   }
 }
 
-export async function saveSettings(dshHome, raw) {
-  const next = normalizeConfig(raw);
-  const dir = path.dirname(settingsPath(dshHome));
-  await fsp.mkdir(dir, { recursive: true });
-  await fsp.writeFile(settingsPath(dshHome), `${JSON.stringify(next, null, 2)}\n`, "utf8");
-  return next;
-}
-
 export function mergeConfig(pluginCfg, saved) {
   return normalizeConfig({ ...DEFAULT_CONTINUE_RETRY, ...pluginCfg, ...saved });
 }
@@ -96,8 +101,15 @@ export function isAbnormalReason(reason) {
   return Boolean(reason && ABNORMAL_KINDS.has(reason.kind));
 }
 
+export function failureCodeOf(reason) {
+  const raw = reason?.error?.code ?? reason?.failure?.code ?? reason?.code;
+  return String(raw || "").toUpperCase();
+}
+
 export function shouldAutoContinue(reason) {
-  return isAbnormalReason(reason) && !isUserAbort(reason);
+  if (!isAbnormalReason(reason) || isUserAbort(reason)) return false;
+  const code = failureCodeOf(reason);
+  return !code || !NO_CONTINUE_CODES.has(code);
 }
 
 export function isPermanentFailure(code) {
@@ -116,13 +128,17 @@ export function makeContinueMessage(text) {
     role: "user",
     content: [{ type: "text", text: body }],
     source: {
-      kind: "plugin",
-      plugin: "dsh-purge",
+      kind: "dsh-purge",
       form: "notice",
       summary: "continue",
     },
   };
 }
+
+// cordis 没有 session/removed 事件可挂,长开进程 session 一直累积。
+// 用 Map 插入顺序做 FIFO 兜底:超过 CAP 就丢最早的一批。
+const TRACKER_SESSION_CAP = 200;
+const TRACKER_SESSION_EVICT = 50;
 
 export function createTracker() {
   const bySession = new Map();
@@ -132,6 +148,14 @@ export function createTracker() {
     if (!id) return null;
     let cur = bySession.get(id);
     if (!cur) {
+      if (bySession.size >= TRACKER_SESSION_CAP) {
+        let i = 0;
+        for (const k of bySession.keys()) {
+          if (i >= TRACKER_SESSION_EVICT) break;
+          bySession.delete(k);
+          i += 1;
+        }
+      }
       cur = { retry: 0, continue: 0, lastContinueSeq: 0, lastRetryKey: "" };
       bySession.set(id, cur);
     }
@@ -139,15 +163,6 @@ export function createTracker() {
   }
 
   return {
-    retryUsed(sessionId) {
-      return slot(sessionId)?.retry || 0;
-    },
-    continueUsed(sessionId) {
-      return slot(sessionId)?.continue || 0;
-    },
-    lastContinueSeq(sessionId) {
-      return slot(sessionId)?.lastContinueSeq || 0;
-    },
     takeRetry(sessionId, key, max) {
       const cur = slot(sessionId);
       if (!cur || max <= 0) return false;
@@ -157,38 +172,46 @@ export function createTracker() {
       cur.lastRetryKey = key || "";
       return true;
     },
-    takeContinue(sessionId, seq, max) {
+    takeContinue(sessionId, seq, max, maxFailStreak = 3) {
       const cur = slot(sessionId);
       if (!cur || max <= 0) return false;
       if (seq && cur.lastContinueSeq === seq) return false;
       if (cur.continue >= max) return false;
+      if ((cur.failStreak || 0) >= maxFailStreak) return false;
       cur.continue += 1;
       cur.lastContinueSeq = seq || 0;
       return true;
     },
-    refundContinue(sessionId) {
+    refundContinue(sessionId, seq) {
       const cur = slot(sessionId);
       if (!cur || cur.continue <= 0) return;
       cur.continue -= 1;
-      cur.lastContinueSeq = 0;
+      // 关键:不清 lastContinueSeq —— 同一 seq 的失败不再重复消耗 continue 预算
+      // 关键:记录连续失败次数,达到 maxFailStreak 永久停手(Issue #85)
+      cur.failStreak = (cur.failStreak || 0) + 1;
+      if (seq) {
+        cur.failedSeqs = cur.failedSeqs || new Set();
+        // cap:长会话 failedSeqs 永不清(resetIfCompleted 只在 completed/blocked 时清),
+        // 失败 seq 累积几千几万 → Set 内存涨。cap 256,超了删最老的(Set 保持 insertion order)。
+        if (cur.failedSeqs.size >= 256) {
+          const oldest = cur.failedSeqs.values().next().value;
+          if (oldest !== undefined) cur.failedSeqs.delete(oldest);
+        }
+        cur.failedSeqs.add(seq);
+      }
     },
     reset(sessionId) {
       const id = String(sessionId || "");
       if (id) bySession.delete(id);
     },
     resetIfCompleted(sessionId, reason) {
-      if (reason?.kind === "completed" || reason?.kind === "blocked") this.reset(sessionId);
+      if (reason?.kind === "completed" || reason?.kind === "blocked") {
+        const cur = bySession.get(String(sessionId || ""));
+        if (cur) { cur.failStreak = 0; cur.failedSeqs = undefined; }
+        this.reset(sessionId);
+      }
     },
   };
-}
-
-function service(ctx, name) {
-  if (!ctx || typeof ctx.get !== "function") return undefined;
-  try {
-    return ctx.get(name);
-  } catch {
-    return undefined;
-  }
 }
 
 export function sessionEventsOf(agent) {
@@ -216,23 +239,14 @@ export function inspectTurn(events) {
   };
 }
 
-export function resolveAgent(ctx, sessionId) {
-  const agents = service(ctx, "agents");
-  if (!agents || typeof agents.get !== "function") return null;
-  try {
-    return agents.get(sessionId) || null;
-  } catch {
-    return null;
-  }
-}
-
 export function hasFreshHumanTurn(events) {
   const list = Array.isArray(events) ? events : [];
   const end = lastTurnEnd(list);
   const after = end ? list.filter((event) => (event?.seq || 0) > end.seq) : list;
   return after.some((event) => {
     if (event?.type !== "user/message") return false;
-    return event.data?.source?.kind !== "plugin";
+    const kind = event.data?.source?.kind;
+    return kind !== "plugin" && kind !== "dsh-purge";
   });
 }
 
@@ -302,7 +316,10 @@ export function installContinueRetry(ctx, options = {}) {
     if (!info.auto) return;
     if (!tracker.takeContinue(id, info.seq, cfg.continueMax)) return;
     const sent = sendContinue(agent, cfg.continueText);
-    if (!sent.ok) tracker.refundContinue(id);
+    if (!sent.ok) {
+      tracker.refundContinue(id, info.seq);
+      console.warn(`[dsh-purge] auto-continue send failed (session=${id}, seq=${info.seq}):`, sent.error);
+    }
   }
 
   const offError = listen("agent/request-error", async (payload, next) => {
@@ -314,6 +331,10 @@ export function installContinueRetry(ctx, options = {}) {
     const id = sessionIdOf(payload?.agent);
     const key = `${payload?.turn || 0}:${payload?.step || 0}:${payload?.failure?.code || ""}`;
     if (!tracker.takeRetry(id, key, cfg.retryMax)) return downstream;
+    // [方案2] 标记 retry pending,让下次 system-prompt/assemble 强制塞 inject
+    // (消费一次后由 shouldInjectAssembly 清掉)。user 发消息自然塞,不需要;
+    // retry 不是 user 触发,messages 结构没变,必须靠这个 flag 让 assemble 吃到。
+    globalThis.__dshPurgeRetryPending = true;
     return { kind: "retry" };
   });
 
@@ -329,53 +350,6 @@ export function installContinueRetry(ctx, options = {}) {
   });
 
   return {
-    tracker,
-    inspect(agentOrEvents) {
-      const events = Array.isArray(agentOrEvents) ? agentOrEvents : sessionEventsOf(agentOrEvents);
-      return inspectTurn(events);
-    },
-    continueNow(agent, opts = {}) {
-      const cfg = getConfig();
-      const id = sessionIdOf(agent);
-      const info = inspectTurn(sessionEventsOf(agent));
-      if (!info.abnormal && !opts.force) return { ok: false, error: "当前不是中断或失败状态" };
-      const max = opts.ignoreBudget ? Number.MAX_SAFE_INTEGER : cfg.continueMax;
-      if (info.seq && tracker.lastContinueSeq(id) === info.seq) {
-        return { ok: false, error: "这一轮已经在继续" };
-      }
-      if (!tracker.takeContinue(id, info.seq, max)) {
-        return { ok: false, error: `继续次数已用完（${cfg.continueMax}）` };
-      }
-      const sent = sendContinue(agent, opts.text || cfg.continueText);
-      if (!sent.ok) {
-        tracker.refundContinue(id);
-        return sent;
-      }
-      return { ok: true, used: tracker.continueUsed(id), max: cfg.continueMax, reason: info.reason?.kind || "" };
-    },
-    status(agent) {
-      const cfg = getConfig();
-      const id = sessionIdOf(agent);
-      const info = inspectTurn(sessionEventsOf(agent));
-      return {
-        ok: true,
-        sessionId: id,
-        canContinue: Boolean(
-          info.abnormal
-          && tracker.continueUsed(id) < cfg.continueMax
-          && tracker.lastContinueSeq(id) !== info.seq
-        ),
-        reason: info.reason?.kind || "",
-        userAbort: info.userAbort,
-        retryUsed: tracker.retryUsed(id),
-        continueUsed: tracker.continueUsed(id),
-        retryMax: cfg.retryMax,
-        continueMax: cfg.continueMax,
-        autoRetry: cfg.autoRetry,
-        autoContinue: cfg.autoContinue,
-        continueText: cfg.continueText,
-      };
-    },
     dispose() {
       for (const timer of timers) clearTimeout(timer);
       timers.clear();

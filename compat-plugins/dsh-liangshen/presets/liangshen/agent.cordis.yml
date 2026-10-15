@@ -6,7 +6,7 @@
 # turn boundary.
 #
 # The presentation is the SDK's ToolPresentationMode, picked by the
-# tool-catalog row's `presentation` key (default `'both'`): `'native'` keeps
+# tool-catalog row's `presentation` key (default `'ptc'`): `'native'` keeps
 # the assembled roster on the wire, `'ptc'` collapses the wire to the single
 # `run_code` transport, and `'both'` keeps the full native roster AND the
 # `run_code` transport co-resident — native calls carry ordinary work while
@@ -84,11 +84,14 @@
   name: '@deepseek-ai/dsh-persona'
   config:
     prefix: |-
-      - Thinking Disruption: Do not repeat reasoning on the same hypothesis more than twice. If necessary facts are missing, immediately close </think> and call native inspection tools (read, grep, bash/pwsh) instead of speculating in thought.
-      - Action-Oriented: Thinking must focus solely on determining the next concrete operation. Do not mentally pre-rehearse full code implementations. All correctness verification must be conducted against actual tool outputs during the execution phase.
-      - Parallel Inspection: When multiple independent inspections, searches, or checks are needed, emit multiple tool calls concurrently in a single turn instead of sequential rounds. The harness executes independent read-only tools in parallel.
+      You are a helpful software engineer assistant.
+
+      - Thinking Disruption: Never reason through the same hypothesis more than twice. When a fact is missing, stop thinking and call a native inspection tool (read, grep, bash/pwsh) to settle it — no speculation without new evidence.
+      - Action-Oriented: Use thinking only to pick the next concrete operation. Do not pre-rehearse implementations in thought; verify every claim against real tool output during execution.
+      - Parallel Inspection: When several independent inspections, searches, or checks are needed, emit all of their tool calls in a single turn rather than across sequential rounds. The harness executes independent read-only calls in parallel.
       - Shell Discipline: Shell processes are ephemeral; directory changes do not persist across tool calls. Use compound commands (e.g. cd <path> && <cmd>) or pass workdir explicitly for operations in subdirectories.
       - Development Standard: Follow YAGNI and the PDCA loop. Each step verifies a single assumption. Do not write redundant comments.
+      - Bounded Inspection & Convergence: Do not traverse dependency chains unbounded. Limit pre-action inspection to immediate target files (at most 2-3 inspection turns). Once core context is understood, immediately converge and begin answering or making edits. Verify edge cases during post-edit testing rather than over-reading upfront.
       - Bounded Output: never dump a large or unbounded command output into the conversation. Filter at the source with grep/head/tail/wc and read the narrow range you actually need; the model's long-range attention is a bounded budget and raw logs evict the session's own constraints from it.
 
 # The mode's preset-local plugins:
@@ -117,6 +120,14 @@
 # non-default modes trade the harness's own channel for a preset-owned one; the
 # default keeps the upstream contract. Set `keepPlanPolicy: false` to drop
 # plan mode's policy section as well.
+#
+# `dispatcher` (default false) is orthogonal to `presentation`: it changes the
+# PROMPT, not the wire. On, the persona section additionally carries the
+# dispatcher rule block (./dispatcher-rules.mjs) after the workspace line, so
+# the session's deliverable becomes the plan, the task book, the review verdict,
+# and the hand-off, and the mode's own discipline stays in force underneath
+# those rules. Off, the assembled prompt is byte-for-byte what it was before
+# the switch existed.
 #
 # `tool-catalog` owns the wire presentation and the model-visible catalog.
 # `presentation` selects the SDK ToolPresentationMode for the session's whole
@@ -157,17 +168,58 @@
     keepPlanPolicy: true
     instructionSource: host
     instructionMaxBytes: 65536
+    # Append the dispatcher rule block to the persona (orthogonal to the wire
+    # presentation): the session dispatches, plans, reviews, and hands off
+    # instead of writing the code itself. On by default; the switch is what
+    # returns a session to the bare persona.
+    dispatcher: true
 
 - id: tool-catalog
   name: ./tool-catalog.mjs
   config:
     descriptionMaxLength: 200
     presentation: 'both'
-    pagedToolPatterns: []
-    maxResidentTokens: 6000
+    pagedToolPatterns: ['mcp__*']
+    maxResidentTokens: 8000
 
 - id: working-context
   name: ./working-context.mjs
+
+# The runtime degeneration circuit breaker: folds a stall (consecutive zero-
+# output long-reasoning steps) or echo (identical-argument tool failures)
+# signal from the durable session event stream and fires once per episode,
+# injecting a breaker message at pre-step. A STALL also steps the reasoning
+# effort one notch down (max -> high, never below the sweet spot) for the next
+# few requests; an echo only gets the message. With no signal it never rewrites
+# a request, so the route's explicit effort and the prefix cache stay
+# untouched. This is the outside force the persona's reflection fuse cannot
+# be: see DSH discussion #5976 and the Agent Note that constrains dynamic
+# reasoning effort to this triggered-only form.
+#
+# The character floor and the two caps are deliberately NOT set here: absent,
+# the guard resolves them per request from the session's reasoning effort
+# (8000 at max / 12000 at high / 20000 at low) and scales them by the
+# sensitivity preset. Setting one here would pin it for every effort level.
+- id: guard
+  name: ./guard.mjs
+  config:
+    enabled: true
+    sensitivity: 'balanced'
+
+# The paging activation handle the catalog points at: with `pagedToolPatterns`
+# non-empty this row is what lets `tool_activate({ namespace })` bring one
+# paged namespace back onto the wire (and the generated SDK) for the session.
+- id: tool-activate
+  name: ./tool-activate.mjs
+
+# The key-fact register: the model pins a hard constraint / confirmed decision /
+# failed path with `fact_register`, the fold rebuilds the register from the
+# durable event stream, and working-context renders it as one field of the
+# [Working Context: ...] line — the surface that lands inside the guaranteed
+# local attention window every step. The counter to V4.1's long-session
+# forgetting; the fold replays identically after resume and compaction.
+- id: fact-ledger
+  name: ./fact-ledger.mjs
 
 # The harness's workspace-instruction loader. Under the default
 # `instructionSource: host` this row owns the channel: its baseline and dynamic
@@ -308,8 +360,8 @@
     - id: tool-result-pruner
       name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
       config:
-        thresholdChars: 8192
-        headChars: 4096
+        thresholdChars: 4096
+        headChars: 2048
         tailChars: 1024
 
 # ── delegation and workflows ────────────────────────────────────────────────
@@ -341,19 +393,36 @@
     - id: tool-subagent-list-agents
       name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
 
+    # `modelSelectionSettings: true` opts this row into the child-model
+    # selection the Web settings page owns per Session: the tool then
+    # publishes `provider` / `model` / `reasoning_effort` parameters and the
+    # `list_subagent_models` discovery tool, and an explicit route is
+    # checked against the Session's allowed list. Without it the settings
+    # toggle reads as dead under this preset and an explicit selection
+    # fails with `child model selection is disabled for this tool instance`.
+    #
+    # EXACTLY ONE delegation row per composition scope may opt in. The
+    # opt-in registers the discovery tool under the FIXED name
+    # `list_subagent_models` in the scope the row composes into, and the tool
+    # registry refuses a second registration of one name in one scope, so a
+    # second opt-in row fails the whole session with `tool
+    # 'list_subagent_models' is already registered in this scope`. The fork
+    # row below therefore stays without it, exactly as the builtin Standard,
+    # PTC, and Cordis presets ship: their `tool-subagent` row opts in and
+    # their `tool-subagent-fork` row does not. Do not complete the
+    # fork row to match; the opt-in belongs to the spawn row alone.
     - id: tool-subagent
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
         provider: spawn
         toolName: subagent
-        backgroundMode: continuable
+        modelSelectionSettings: true
 
     - id: tool-subagent-fork
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
         provider: fork
         toolName: subagent_fork
-        backgroundMode: continuable
 
     # Product providers are host-plane singletons. Copy this preset, then
     # remove `disabled` from either ordinary tool row to expose that product
@@ -364,7 +433,6 @@
       config:
         provider: codex
         toolName: subagent_codex
-        enableRunInBackground: false
         maxDepth: provider-managed
 
     - id: tool-subagent-claude-code
@@ -373,7 +441,6 @@
       config:
         provider: claude-code
         toolName: subagent_claude_code
-        enableRunInBackground: false
         maxDepth: provider-managed
 
     - id: workflow-ptc
@@ -410,6 +477,5 @@
 - id: tool-web
   name: '@deepseek-ai/dsh-tool-web'
   config:
-    fetch: true
+    fetch: false
     searchTimeoutMs: 60000
-    # [dsh-purge] preset fetch enabled

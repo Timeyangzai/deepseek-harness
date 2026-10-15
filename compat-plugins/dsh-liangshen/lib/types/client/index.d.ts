@@ -18,12 +18,50 @@
  * thrown — one external plugin must not take the GUI boot down.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis';
-import type { SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client';
+import type { ConfigForm, ConfigForms } from '@deepseek-ai/dsh-client-ui-settings/client';
+import { type LiangShenSettings } from './LiangShenSettingsCard.tsx';
 import { type LiangShenKey } from './locales.ts';
 /** Locale namespace this half owns. */
 export declare const NS = "liangshen";
-/** Settings namespace the settings card edits (the Host plugin registers it). */
-export declare const SETTINGS_NAMESPACE = "dsh-liangshen";
+/**
+ * Settings namespace the settings card edits: the family identity of this
+ * plugin's own settings form, and the row id a standalone bundle install
+ * carries. The aggregate install mounts the generated `web-ui-liangshen` row
+ * instead, and the family binder resolves between the two.
+ */
+export declare const SETTINGS_NAMESPACE = "liangshen";
+/**
+ * The profile entry id this package's own row carries, for a page that serves
+ * no family binder.
+ *
+ * The shared describe mirror is the only local evidence of which row id this
+ * profile actually serves, but it answers asynchronously: at plugin activation
+ * it usually holds nothing yet. An unanswered or empty mirror is therefore NOT
+ * evidence of absence, and binding the bare namespace there is what made every
+ * save fail with `No configurable plugin entry "liangshen"` — the form is
+ * bound once per session, so a wrong guess never recovers. The aggregate row id
+ * is the answer that matches nearly every deployment; only a mirror that
+ * answers with OTHER plugins' rows keeps the namespace as the last resort (the
+ * pre-0.1.7 keying shape), because that answer is the one that actually proves
+ * this package's own row is not served.
+ * @param forms - the shared configuration forms service.
+ * @returns the entry id to bind.
+ */
+export declare function servedEntryId(forms: ConfigForms): string;
+/**
+ * Bind the settings form the card stages over.
+ *
+ * The family binder comes first: it is what resolves this package's family
+ * namespace onto the profile entry id the Host serves the form under, and it
+ * keeps the loopback bridge as its own fallback. A page without that group (or
+ * one where its client half has not applied yet) binds through the shared forms
+ * service, on the entry id the describe mirror justifies and rebound as soon as
+ * the mirror answers — see {@link createServedEntryForm} for why a one-shot
+ * guess cannot be right for both an aggregate and a standalone install.
+ * @param ctx - the browser plugin context.
+ * @returns the form the settings card reads and writes.
+ */
+export declare function bindSettingsForm(ctx: ClientContext): ConfigForm<LiangShenSettings>;
 /** Owner share of a plugin card (the section supplies nothing). */
 export interface SettingsPluginItemOwnerProps {
     /** Marker field: card owner props are intentionally empty. */
@@ -33,8 +71,9 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     interface SlotMap {
         /**
          * The child slot the Web UI plugin group declares; this card registers into
-         * the group instead of the top-level `settings.plugin.item` list. Declared
-         * here so this package needs no dependency on the sibling UI package.
+         * the group's list seat rather than the official bundle-configuration
+         * seat. Declared here so this package needs no dependency on the sibling UI
+         * package.
          */
         'web-ui.plugin.item': {
             kind: 'list';
@@ -46,20 +85,32 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 declare module '@deepseek-ai/cordis' {
     interface Context {
         /**
-         * Optional compatibility binder provided by dsh-web-settings; absent when
-         * that group plugin is not installed, so callers fall back to the official
-         * settings scope.
+         * Optional family settings binder provided by dsh-web-settings; absent when
+         * that group plugin is not installed, so callers bind the shared forms
+         * service (`ctx.configForms`) by profile entry id directly.
          */
         webUiSettings?: {
-            bind<S>(spec: SettingsScopeSpec<S>): import('@deepseek-ai/dsh-client-ui-settings/client').SettingsScope<S>;
+            bind<S>(spec: LiangShenFormSpec<S>): ConfigForm<S>;
         };
     }
 }
 /**
- * Required client services: the slot registry, locale, sessions, and the roster
- * Remote. Both `remote` and `remote.agentPresets` are declared: the context
- * proxy refuses an uninjected service, and a nested service name does not imply
- * its parent, so reading `ctx.remote.agentPresets` needs `remote` as well.
+ * One settings namespace a family card binds. The 0.1.7 client exports no spec
+ * type (the form controller takes it privately), so the binder's input shape is
+ * restated here.
+ */
+export interface LiangShenFormSpec<T> {
+    /** Settings namespace registered by the owning host plugin. */
+    namespace: string;
+    /** Narrow one wire section; undefined keeps the last accepted value. */
+    decode?: (section: unknown) => T | undefined;
+}
+/**
+ * Required client services: the slot registry, locale, sessions, the shared
+ * configuration forms, and the roster Remote. Both `remote` and
+ * `remote.agentPresets` are declared: the context proxy refuses an uninjected
+ * service, and a nested service name does not imply its parent, so reading
+ * `ctx.remote.agentPresets` needs `remote` as well.
  */
 export declare const inject: string[];
 declare module '@deepseek-ai/dsh-client-ui-slots' {

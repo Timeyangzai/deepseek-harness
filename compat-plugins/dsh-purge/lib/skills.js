@@ -2,7 +2,9 @@ import { promises as fsp } from "node:fs";
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import { findDshHome } from "./core.js";
+import crypto from "node:crypto";
+import { findDshHome, atomicWriteFile } from "./core.js";
+import { extractZipArchive, listZipFile } from "./zip-extract.js";
 
 export { findDshHome };
 
@@ -13,6 +15,7 @@ const MAX_ARCHIVE_BYTES = 12 * 1024 * 1024;
 const MAX_IMPORT_FILES = 200;
 const MAX_DESCRIPTION = 500;
 const SKIP_COPY_NAMES = new Set([".", "..", ".system", ".git", "node_modules", "__MACOSX", ".DS_Store"]);
+const MAX_UNPACKED_BYTES = 50 * 1024 * 1024;
 
 export function validSkillName(id) {
   return typeof id === "string" && SKILL_NAME_RE.test(id);
@@ -66,6 +69,31 @@ function assertInside(root, target) {
   }
 }
 
+/** 源与 $DSH_HOME/skills 重叠时先删后拷会把自己删空（#54）。 */
+function pathsOverlap(a, b) {
+  // 必须 realpath — 只 resolve 不解 symlink,软链到 skills 下的路径 resolve 后不匹配,
+  // 删除时顺着 symlink 把 skills 删穿。realpath 对不存在路径会 throw,fallback 到 resolve。
+  const toReal = (p) => {
+    const abs = path.resolve(String(p || ""));
+    if (!abs) return "";
+    try { return fs.realpathSync.native ? fs.realpathSync.native(abs) : fs.realpathSync(abs); }
+    catch { return abs; }
+  };
+  const left = toReal(a);
+  const right = toReal(b);
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const leftPrefix = left.endsWith(path.sep) ? left : left + path.sep;
+  const rightPrefix = right.endsWith(path.sep) ? right : right + path.sep;
+  return left.startsWith(rightPrefix) || right.startsWith(leftPrefix);
+}
+
+function assertImportSourceOutsideSkills(dshHome, srcPath) {
+  const root = skillsDir(dshHome);
+  if (!pathsOverlap(srcPath, root)) return;
+  throw new Error("不能从 $DSH_HOME/skills 自身（或其子目录）导入，请换一个源目录");
+}
+
 function yamlScalar(value) {
   const text = String(value ?? "").trim();
   if (!text) return '""';
@@ -87,13 +115,74 @@ export function splitFrontmatter(raw) {
   };
 }
 
+/**
+ * YAML 块标量解析：覆盖 `|`, `>`, `|-`, `|+`, `>-`, `>+`, `|2` 等 chomp/indent 指示。
+ * 只扫 frontmatter，返回**压成单行**的字符串（换行→空格），因为上游面板按单行描述渲染。
+ * 不支持 anchor / alias / tag / 多行 flow —— SKILL.md 不该出现。
+ */
+function escapeYamlKey(s) {
+  // frontmatter key 走到 RegExp 构造前必须 escape:当前调用点都是硬编码字面量,
+  // 但万一未来有数据驱动场景,点 / 美元符 / 括号在正则里是元字符,会错配或 ReDoS。
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function blockScalarValue(head, key) {
+  const lines = String(head || "").split(/\r?\n/);
+  const headerRe = new RegExp(`^(\\s*)${escapeYamlKey(key)}:\\s*([|>])([+-]?)(\\d*)\\s*(?:#.*)?$`);
+  let headerIdx = -1;
+  let keyIndent = 0;
+  let style = "|";
+  let chomp = "";
+  let indentHint = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = lines[i].match(headerRe);
+    if (!m) continue;
+    headerIdx = i;
+    keyIndent = m[1].length;
+    style = m[2];
+    chomp = m[3] || "";
+    indentHint = m[4] ? parseInt(m[4], 10) : 0;
+    break;
+  }
+  if (headerIdx < 0) return "";
+  const body = [];
+  let blockIndent = indentHint > 0 ? keyIndent + indentHint : 0;
+  for (let i = headerIdx + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (line.trim() === "") { body.push(""); continue; }
+    const indent = line.match(/^(\s*)/)[1].length;
+    if (indent <= keyIndent) break;
+    if (!blockIndent) blockIndent = indent;
+    if (indent < blockIndent) break;
+    body.push(line.slice(blockIndent));
+  }
+  while (body.length && body[body.length - 1] === "") body.pop();
+  let text;
+  if (style === "|") {
+    text = body.join("\n");
+  } else {
+    text = "";
+    for (let i = 0; i < body.length; i += 1) {
+      const cur = body[i];
+      if (i === 0) { text += cur; continue; }
+      if (cur === "") { text += "\n"; continue; }
+      if (body[i - 1] === "") { text += cur; continue; }
+      text += " " + cur;
+    }
+  }
+  if (chomp === "+") text += "\n";
+  else if (chomp !== "-" && text.length > 0) text += "\n";
+  return text.replace(/\s+/g, " ").trim();
+}
+
 function yamlLineField(head, key) {
-  const re = new RegExp(`^${key}:\\s*(.*)$`, "m");
+  const re = new RegExp(`^${escapeYamlKey(key)}:\\s*(.*)$`, "m");
   const match = String(head || "").match(re);
   if (!match) return "";
   let value = match[1].trim();
   if (!value) return "";
-  if (value === "|" || value === ">" || value === "|-" || value === ">-") return "";
+  // 块标量：`|`, `>`, 加 chomp (`-`/`+`) 或 indent 指示（`|2`）—— 调用 blockScalarValue 解析正文。
+  if (/^[|>][+-]?\d*\s*(?:#.*)?$/.test(value)) return blockScalarValue(head, key);
   if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
     try {
       return value.startsWith("\"") ? JSON.parse(value) : value.slice(1, -1);
@@ -106,6 +195,22 @@ function yamlLineField(head, key) {
   return value;
 }
 
+function yamlBoolField(head, key) {
+  const re = new RegExp(`^${key}:\\s*(.*)$`, "m");
+  const match = String(head || "").match(re);
+  if (!match) return { present: false };
+  let value = match[1].trim();
+  if ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'"))) {
+    value = value.slice(1, -1).trim();
+  }
+  const comment = value.indexOf(" #");
+  if (comment >= 0) value = value.slice(0, comment).trim();
+  const norm = value.toLowerCase();
+  if (["true", "yes", "on", "1"].includes(norm)) return { present: true, value: true };
+  if (["false", "no", "off", "0"].includes(norm)) return { present: true, value: false };
+  return { present: true, invalid: true };
+}
+
 export function parseSkillDocument(raw) {
   const parts = splitFrontmatter(raw);
   if (!parts) return { ok: false, error: "缺少 YAML frontmatter（须以 --- 包围）" };
@@ -113,7 +218,20 @@ export function parseSkillDocument(raw) {
   const description = yamlLineField(parts.head, "description");
   if (!validSkillName(name)) return { ok: false, error: "frontmatter.name 必须是 kebab-case，例如 code-review" };
   if (!description) return { ok: false, error: "frontmatter.description 必填（单行）" };
-  return { ok: true, name, description, body: parts.body, head: parts.head };
+  const disableModel = yamlBoolField(parts.head, "disable-model-invocation");
+  const userInvocable = yamlBoolField(parts.head, "user-invocable");
+  if (disableModel.invalid) return { ok: false, error: "disable-model-invocation 必须是布尔值（true/false）" };
+  if (userInvocable.invalid) return { ok: false, error: "user-invocable 必须是布尔值（true/false）" };
+  return {
+    ok: true,
+    name,
+    description,
+    whenToUse: yamlLineField(parts.head, "whenToUse"),
+    modelInvocable: disableModel.value !== true,
+    userInvocable: userInvocable.value !== false,
+    body: parts.body,
+    head: parts.head,
+  };
 }
 
 export function renderSkillDocument(id, description, body = "") {
@@ -148,14 +266,6 @@ export function formatSize(bytes) {
   return `${kb >= 100 ? Math.round(kb) : kb.toFixed(1)} KB`;
 }
 
-async function fileSize(fp) {
-  try {
-    return (await fsp.stat(fp)).size;
-  } catch {
-    return 0;
-  }
-}
-
 async function pathExists(fp) {
   try {
     await fsp.access(fp);
@@ -174,6 +284,9 @@ async function skillFromFile(id, fp, kind) {
     path: fp,
     content,
     description: parsed.ok ? parsed.description : "",
+    whenToUse: parsed.ok ? parsed.whenToUse : "",
+    modelInvocable: parsed.ok ? parsed.modelInvocable : false,
+    userInvocable: parsed.ok ? parsed.userInvocable : false,
     valid: parsed.ok,
     error: parsed.ok ? null : parsed.error,
     size: Buffer.byteLength(content, "utf8"),
@@ -259,7 +372,8 @@ async function backupExisting(dshHome, id) {
   const hasFlat = await pathExists(flat);
   if (!hasBundle && !hasFlat) return null;
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const dest = path.join(skillBackupDir(dshHome), `${id}_${stamp}`);
+  const uniq = `${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
+  const dest = path.join(skillBackupDir(dshHome), `${id}_${stamp}_${uniq}`);
   assertInside(path.join(dshHome, "dsh-purge-backups"), dest);
   await fsp.mkdir(dest, { recursive: true });
   if (hasBundle) {
@@ -307,9 +421,20 @@ export async function saveSkill(dshHome, id, content, description) {
   const dest = skillBundleFile(dshHome, id);
   assertInside(root, dest);
   const backup = await backupExisting(dshHome, id);
-  await removeOfficialSkill(dshHome, id);
-  await fsp.mkdir(skillBundleDir(dshHome, id), { recursive: true });
-  await fsp.writeFile(dest, document, "utf8");
+  try {
+    await removeOfficialSkill(dshHome, id);
+    await fsp.mkdir(skillBundleDir(dshHome, id), { recursive: true });
+    await atomicWriteFile(dest, document);
+  } catch (err) {
+    try { await restoreSkillFromBackup(dshHome, id, backup); }
+    catch (restoreErr) {
+      console.warn(
+        "[dsh-purge] saveSkill restore failed:",
+        restoreErr && restoreErr.message ? restoreErr.message : restoreErr,
+      );
+    }
+    throw err;
+  }
   return {
     id,
     path: dest,
@@ -345,14 +470,31 @@ function isUnsafeArchiveEntry(name) {
   return rel.split("/").some((part) => part === ".." || part === "");
 }
 
+function splitLines(text) {
+  return String(text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+}
+
 function listArchiveEntries(archivePath) {
   const result = spawnSync("tar", ["-tf", archivePath], {
     windowsHide: true,
     encoding: "utf8",
     timeout: 15000,
   });
-  if (result.status !== 0) return null;
-  return String(result.stdout || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (result.status === 0) return splitLines(result.stdout);
+  if (/\.zip$/i.test(archivePath)) {
+    const unzip = spawnSync("unzip", ["-Z1", archivePath], {
+      windowsHide: true,
+      encoding: "utf8",
+      timeout: 15000,
+    });
+    if (unzip.status === 0) return splitLines(unzip.stdout);
+    try {
+      return listZipFile(archivePath);
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 function extractArchive(archivePath, dest) {
@@ -363,24 +505,20 @@ function extractArchive(archivePath, dest) {
   if (entries && entries.length > MAX_IMPORT_FILES) {
     throw new Error("压缩包里文件太多");
   }
+  if (/\.zip$/i.test(archivePath)) {
+    try {
+      extractZipArchive(archivePath, dest);
+      return;
+    } catch (error) {
+      throw new Error(String(error && error.message ? error.message : error));
+    }
+  }
   const result = spawnSync("tar", ["-xf", archivePath, "-C", dest], {
     windowsHide: true,
     encoding: "utf8",
     timeout: 30000,
   });
   if (result.status === 0) return;
-  if (/\.zip$/i.test(archivePath) && process.platform === "win32") {
-    const ps = spawnSync("powershell", [
-      "-NoProfile",
-      "-Command",
-      `Expand-Archive -LiteralPath '${String(archivePath).replace(/'/g, "''")}' -DestinationPath '${String(dest).replace(/'/g, "''")}' -Force`,
-    ], {
-      windowsHide: true,
-      encoding: "utf8",
-      timeout: 30000,
-    });
-    if (ps.status === 0) return;
-  }
   const detail = String(result.stderr || result.stdout || "").trim();
   throw new Error(detail || "无法解压，请改用文件夹导入");
 }
@@ -437,7 +575,30 @@ export async function findSkillRoots(root) {
   return { dirs, flats };
 }
 
+async function restoreSkillFromBackup(dshHome, id, backup) {
+  if (!backup) return;
+  const root = skillsDir(dshHome);
+  const bundleSrc = path.join(backup, id);
+  const flatSrc = path.join(backup, `${id}.md`);
+  try {
+    if (await pathExists(bundleSrc)) {
+      const dest = skillBundleDir(dshHome, id);
+      assertInside(root, dest);
+      await fsp.rm(dest, { recursive: true, force: true }).catch(() => {});
+      await copyDir(bundleSrc, dest);
+    }
+    if (await pathExists(flatSrc)) {
+      const dest = skillFlatFile(dshHome, id);
+      assertInside(root, dest);
+      await fsp.copyFile(flatSrc, dest);
+    }
+  } catch {
+    // 回滚失败时保留 backup 路径给调用方。
+  }
+}
+
 async function installBundleDir(dshHome, srcDir, fallbackId) {
+  assertImportSourceOutsideSkills(dshHome, srcDir);
   const mdPath = path.join(srcDir, "SKILL.md");
   const raw = await fsp.readFile(mdPath, "utf8");
   const parsed = parseSkillDocument(raw);
@@ -445,19 +606,30 @@ async function installBundleDir(dshHome, srcDir, fallbackId) {
   if (!validSkillName(id)) throw new Error("压缩包/文件夹里没有合法的 Skill 名称");
   const dest = skillBundleDir(dshHome, id);
   assertInside(skillsDir(dshHome), dest);
+  if (pathsOverlap(srcDir, dest)) {
+    throw new Error("不能从目标技能目录自身导入，请换一个源目录");
+  }
   const backup = await backupExisting(dshHome, id);
   await removeOfficialSkill(dshHome, id);
-  await copyDir(srcDir, dest);
-  const destMd = path.join(dest, "SKILL.md");
-  if (parsed.ok && parsed.name !== id) {
-    await fsp.writeFile(destMd, mergeSkillDocument(id, parsed.description, raw), "utf8");
-  } else if (!parsed.ok && !String(raw).replace(/^\uFEFF/, "").startsWith("---")) {
-    await fsp.writeFile(destMd, renderSkillDocument(id, id, raw), "utf8");
+  try {
+    await copyDir(srcDir, dest);
+    const destMd = path.join(dest, "SKILL.md");
+    if (!(await pathExists(destMd))) throw new Error("导入后缺少 SKILL.md");
+    if (parsed.ok && parsed.name !== id) {
+      await fsp.writeFile(destMd, mergeSkillDocument(id, parsed.description, raw), "utf8");
+    } else if (!parsed.ok && !String(raw).replace(/^\uFEFF/, "").startsWith("---")) {
+      await fsp.writeFile(destMd, renderSkillDocument(id, id, raw), "utf8");
+    }
+    return { id, path: destMd, backup, description: parsed.ok ? parsed.description : id };
+  } catch (err) {
+    await fsp.rm(dest, { recursive: true, force: true }).catch(() => {});
+    await restoreSkillFromBackup(dshHome, id, backup);
+    throw err;
   }
-  return { id, path: destMd, backup, description: parsed.ok ? parsed.description : id };
 }
 
 async function installFlatFile(dshHome, srcFile, fallbackId) {
+  assertImportSourceOutsideSkills(dshHome, srcFile);
   const raw = await fsp.readFile(srcFile, "utf8");
   const parsed = parseSkillDocument(raw);
   const id = parsed.ok ? parsed.name : kebabFromLabel(fallbackId || path.basename(srcFile, ".md"));
@@ -466,6 +638,7 @@ async function installFlatFile(dshHome, srcFile, fallbackId) {
 }
 
 async function installFoundSkills(dshHome, root, fallbackId) {
+  assertImportSourceOutsideSkills(dshHome, root);
   const found = await findSkillRoots(root);
   const imported = [];
   for (const dir of found.dirs) {
@@ -491,7 +664,21 @@ export async function importArchive(dshHome, buffer, filename = "skill.zip") {
     await fsp.mkdir(unpacked, { recursive: true });
     await fsp.writeFile(archive, bytes);
     extractArchive(archive, unpacked);
-    await walkFiles(unpacked, async () => {});
+    let total = 0;
+    await walkFiles(unpacked, async (fp) => {
+      // 非 ENOENT 的 fs 错误要 rethrow,否则磁盘损坏 / EACCES / EMFILE 都被吞,
+      // size 累计漏算,导入看似成功但产物坏。ENOENT 可能是枚举后被外部删了,安全跳过。
+      let st;
+      try { st = await fsp.stat(fp); }
+      catch (err) {
+        if (err && err.code === "ENOENT") return;
+        throw err;
+      }
+      total += st.size;
+      if (total > MAX_UNPACKED_BYTES) {
+        throw new Error(`压缩包解压后超过 ${Math.floor(MAX_UNPACKED_BYTES / 1024 / 1024)}MB`);
+      }
+    });
     const imported = await installFoundSkills(dshHome, unpacked, kebabFromLabel(filename));
     return { imported: imported.map((item) => toPublicSkill(dshHome, item)) };
   } finally {
