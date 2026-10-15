@@ -2,7 +2,7 @@
   "name": "dsh-profile-desktop",
   "private": true,
   "dependencies": {
-    "@jiesou/dsh-opencode-zen-free-provider": "0.1.23",
+    "@jiesou/dsh-opencode-zen-free-provider": "file:../../local-plugins/dsh-opencode-zen-free-provider",
     "@linxin666/dsh-liangshen": "file:../../local-plugins/dsh-liangshen",
     "dsh-purge": "file:../../local-plugins/dsh-purge"
   },

@@ -51,6 +51,8 @@ API 密钥输入框初始为空，并通过 `autocomplete="new-password"` 请求
 
 `llm-deepseek` 的 DeepSeek 卡片编辑端点、凭据和模型目录。它使用 Messages，默认端点占位符为 `https://api.deepseek.com/anthropic`。
 
+第三方提供商可将 volatile `models` schema 标记为 `.role('model-catalog')`，并为其设置 namespace 注册模型发现，从而展示仅编辑模型目录的界面。每行使用 `id` 和可选的 `name`、`contextWindow`、`maxTokens`、`input`。首次编辑前显示发现的默认模型，编辑后保存完整数组；显式空数组保持为空，**恢复默认模型**会移除覆盖。此编辑器不写入凭据或端点，并保留插件的其他设置。
+
 展开**自定义设置 → 模型选项**编辑模型。两个提供商家族共用相同的模型行布局、标签和图标：上下文窗口与最大输出 token 数分为两列，**输入类型**独占下一行，提供**文本**和**图片**复选框。未声明输入类型的模型行优先显示已安装模型的输入类型，其次是提供商默认值，最后回退为文本。已知 pi-ai 提供商会加载已安装目录，不向端点发送请求；打开模型行不会写入覆盖值。显式输入选择具有优先权，包括为视觉模型设置的仅文本覆盖。修改复选框会保存所选类型，且至少保留一种。DeepSeek 写入 `inputModalities`，pi-ai 写入 `input`。DeepSeek 取消勾选图片时，还会移除 `imagePixelBudget` 和 `imageMaxBytes`，因为适配器在没有图片输入时拒绝这些限制。在 `cordis.patch.yml` 中清除输入字段可恢复适配器继承；**恢复默认模型**会重置整个模型目录覆盖。仅声明上游模型实际能够处理的输入类型。
 
 ### 新增与删除提供商

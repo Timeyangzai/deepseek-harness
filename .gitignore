@@ -5,6 +5,8 @@ apps/desktop/.env.macos
 apps/desktop/*.p12
 node_modules/
 lib/
+!compat-plugins/dsh-opencode-zen-free-provider/lib/
+!compat-plugins/dsh-opencode-zen-free-provider/lib/**
 *.tsbuildinfo
 pnpm-debug.log
 .pnpm-store/

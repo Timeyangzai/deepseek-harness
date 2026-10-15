@@ -1,9 +1,10 @@
 # 本地兼容插件
 
-这里保存本机桌面版使用的两个可复现插件副本：
+这里保存本机桌面版使用的三个可复现插件副本：
 
 - `dsh-purge`：基于 `1.1.71`（上游提交 `6c1d638d1bdcc45ede50fc30249c753d58122a51`），加入 Harness `0.2.1-alpha.2` 的完整提示词、实时回退、源码桌面入口定位和极简工具配置检查。已有 `working-directory:current` 上下文时不再注入废弃的 `{{cwd}}` 模板，标准和梁神模式均使用宿主的工作目录信息。
 - `dsh-liangshen`：基于 `@linxin666/dsh-liangshen@0.4.6`，移除 Harness `0.2.1-alpha.2` 已废弃的子代理后台模式配置。预设由插件注册，旧的 `.agent-presets/liangshen` 应先移到备份目录。
+- `dsh-opencode-zen-free-provider`：基于 `@jiesou/dsh-opencode-zen-free-provider@0.1.23`，保留连接修复，接入原生模型目录编辑器。安装时也需使用本仓库的 Harness 模型设置界面。
 
 插件目录不包含用户会话、密钥或桌面运行缓存。
 
@@ -13,7 +14,13 @@
 
 `desktop-profile/package.json` 记录桌面插件依赖和加载顺序，`desktop-profile/cordis.patch.yml` 记录当前模型与界面设置。中转地址用 `HARNESS_MODEL_BASE_URL` 环境变量代替，密钥只保留 `DEEPSEEK_API_KEY`、`SELF_API_KEY` 引用；启动前设置地址，并在 Harness 的凭证设置中填写密钥。复制配置前先备份目标 profile，完全退出桌面版，将两个兼容插件放入 `$DSH_HOME/local-plugins`，再将模板复制到 `$DSH_HOME/profiles/desktop` 并安装依赖。不要覆盖已有会话或凭证文件。
 
-快照另含 npm 插件 `@jiesou/dsh-opencode-zen-free-provider@0.1.23`，显示名 OpenCode Zen Free。默认模型为 `opencode-zen-free-provider / deepseek-v4.1-flash-free`，实测可正常对话。`maxTokens` 和上下文容量也是当前配置快照，不代表所有上游都支持这些数值。
+OpenCode Zen Free 使用本地兼容副本：将 `dsh-opencode-zen-free-provider` 复制到 `$DSH_HOME/local-plugins`，profile 依赖通过 `file:../../local-plugins/dsh-opencode-zen-free-provider` 指向它。默认模型为 `opencode-zen-free-provider / deepseek-v4.1-flash-free`。旧的独立连接补丁保留供原版 npm 包使用，本地副本已含该修复，不需重复应用。
+
+### OpenCode Zen 模型编辑
+
+打开「设置 → 模型 → OpenCode Zen Free → 编辑」，点击模型行右侧展开按钮，即可修改上下文窗口、最大输出 token 数和文本/图片输入类型，支持 `K`、`M` 后缀。保存只写插件的 `models`，不会修改连接参数或密钥；修改会影响后续请求，不中断当前请求。恢复默认模型会移除该覆盖，重新采用插件扫描的目录。手工新增的模型 ID 必须属于当前扫描的免费型号，否则该型号不可调用。
+
+DeepSeek V4.1 Flash Free 的本地默认值为 1,000,000 上下文与 256,000 输出上限：合成输入实测 999,803 tokens 正常完成并找回三个位置的标记；免费接口也接受 `max_tokens=256000` 与 `384000` 的短回复请求。后者仅验证参数被接受，未验证连续生成满该长度。OpenCode 模型页标注 384K 输出，其客户端通常以模型目录和 256K 客户端上限的较小值作为默认输出预算；免费型号目录的 32K 不作为本地副本的硬限制。输入和输出仍共用上下文容量，其他型号保持各自目录参数。
 
 ## OpenCode Zen 免费车道补丁
 

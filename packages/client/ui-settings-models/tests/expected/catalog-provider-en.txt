@@ -1,0 +1,1 @@
+OpenCode Zen Freezen-freeModelsUsing the adapter defaultsFetch available modelsContext windowMax output tokensInput typesTextImageAdd modelCancelApply

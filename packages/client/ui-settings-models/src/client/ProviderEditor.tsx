@@ -41,7 +41,7 @@ import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
 /** Per-adapter-family curated field sets (unknown namespaces get the hint alone). */
-type EditorLayout = 'deepseek' | 'pi-ai' | 'unknown'
+type EditorLayout = 'deepseek' | 'pi-ai' | 'catalog' | 'unknown'
 
 
 
@@ -186,7 +186,9 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   const disabled = props.readOnly || busy
   const accountProvider = props.provider === 'deepseek-account'
   // Account settings use a configurable Cordis entry id.
-  const layout = accountProvider ? 'deepseek' : layoutOf(namespace.ns)
+  const catalogRole = schema.nodeAtPath(root, [...settingsPath, 'models'])?.meta.role
+  const layout = accountProvider ? 'deepseek'
+    : catalogRole === 'model-catalog' ? 'catalog' : layoutOf(namespace.ns)
   const keyRef = refFor(schema, namespace, settingsPath, props.provider)
   // The same schema read the create card makes, so the choices offered here
   // and there cannot drift apart: both come from the adapter's own `Config`.
@@ -198,7 +200,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   )
 
   useEffect(() => {
-    if (accountProvider) return
+    if (accountProvider || layout === 'catalog') return
     let stale = false
     setKeyState(undefined)
     // The key state is a placeholder hint, not a precondition for editing: a
@@ -208,7 +210,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       setKeyState(described)
     })
     return () => { stale = true }
-  }, [operations, keyRef, accountProvider])
+  }, [operations, keyRef, accountProvider, layout])
 
   const stringAt = (source: unknown, key: string): string | undefined => {
     const value = schema.getPath(source, [key])
@@ -346,13 +348,14 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
    * narrowed so the per-family branches below are total: an unknown namespace
    * renders the hint instead and never reaches this body.
    */
-  const curatedFields = (family: 'deepseek' | 'pi-ai'): ReactNode => {
+  const curatedFields = (family: 'deepseek' | 'pi-ai' | 'catalog'): ReactNode => {
     // What a hand-declared route names for itself and nothing else can supply.
     // A whole-section `llm-deepseek` profile is a composition fact with no
     // per-route identity for its schema to carry, hence the family test.
     const ownsIdentity = family === 'pi-ai' && props.declared === true
     const customModels = schema.getPath(draft, ['models'])
     const modelsOverridden = schema.hasPath(draft, ['models'])
+      && (family !== 'catalog' || Array.isArray(customModels))
     const models = modelDrafts(modelsOverridden ? customModels : inheritedModels())
     const defaultContextWindow = schema.getPath(fallback, ['defaultContextWindow'])
     const defaultMaxTokens = schema.getPath(fallback, ['maxTokens'])
@@ -376,6 +379,12 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     if (accountProvider) return <DeepSeekModelsEditor {...catalogProps}
       defaultContextWindow={typeof defaultContextWindow === 'number' ? defaultContextWindow : undefined}
       defaultMaxTokens={typeof defaultMaxTokens === 'number' ? defaultMaxTokens : undefined} />
+    if (family === 'catalog') return <ModelListEditor {...catalogProps}
+      inheritCatalog
+      catalogProvider={props.provider}
+      probe={probe}
+      operations={operations}
+      onBusyChange={setListBusy} />
     return (
       <>
         <div className={styles['field']}>

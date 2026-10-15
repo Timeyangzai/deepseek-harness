@@ -67,6 +67,8 @@ export interface ModelListEditorProps {
   models: readonly ModelDraft[]
   /** Installed provider whose catalog supplies defaults without endpoint I/O. */
   catalogProvider?: string | undefined
+  /** Show the discovered catalog until an edit creates a user-owned array. */
+  inheritCatalog?: boolean
   /** Route input types for models absent from the installed catalog. */
   defaultInput?: readonly string[] | undefined
   /** Whether the user layer currently owns the whole array; absent on a create. */
@@ -146,7 +148,7 @@ function adopt(candidate: LlmDiscoveredModel): ModelDraft {
  * @returns the model-list editor.
  */
 export function ModelListEditor(props: ModelListEditorProps): ReactNode {
-  const { models, onChange, probe, operations, t, disabled, onBusyChange } = props
+  const { models: draftedModels, onChange, probe, operations, t, disabled, onBusyChange } = props
   const { catalogProvider } = props
   const [busy, setBusy] = useState(false)
   useEffect(() => { onBusyChange(busy) }, [busy, onBusyChange])
@@ -166,6 +168,9 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
     return () => { current = false }
   }, [catalogProvider, operations, probe.settingsNs])
   const catalog = inheritedCatalog?.provider === catalogProvider ? inheritedCatalog?.models : undefined
+  const models = props.inheritCatalog === true && props.overridden === false
+    ? catalog?.map(adopt) ?? draftedModels
+    : draftedModels
   const inputDefaults = useMemo(() => new Map(catalog?.map(model => [model.id, model.inputModalities])), [catalog])
   const [candidates, setCandidates] = useState<readonly LlmDiscoveredModel[] | undefined>(undefined)
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())

@@ -1,0 +1,1 @@
+OpenCode Zen Freezen-free模型目录正在使用适配器默认模型获取可用模型上下文窗口最大输出 token 数输入类型文本图片添加模型取消保存
