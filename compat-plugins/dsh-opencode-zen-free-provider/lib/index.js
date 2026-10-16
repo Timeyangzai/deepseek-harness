@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import { readFile, mkdir, rename, writeFile, rm } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { assertUsableApiKey, errorChain, resolveRetryPolicy, RetryPolicySchema } from '@deepseek-ai/dsh-llm';
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai';
 import { credentialRef } from '@deepseek-ai/dsh-credentials';
@@ -11,6 +15,8 @@ export const name = 'opencode-zen-free-provider';
 export const inject = ['llm'];
 const PROVIDER = name;
 const DISPLAY_NAME = 'OpenCode Zen Free';
+const ZEN_BASE_URL = 'https://opencode.ai/inference/v1';
+const ZEN_CATALOG_URL = `${ZEN_BASE_URL}/models`;
 /**
  * Latest CLI version, read off unpkg's `@latest` redirect via the package's own `package.json`.
  *
@@ -154,38 +160,33 @@ const zenApiHeaders = (model, options) => {
 // Zen's free tier only unlocks for the opencode CLI identity, but the harness
 // merges its own mandatory attribution `user-agent` over model headers
 // (dsh-llm's attributionHeaders, merged after model.headers by pi-ai's client),
-// so the fetch layer is the only place that still wins. Scoped to
-// opencode.ai/zen: every other URL keeps the harness attribution untouched.
+// so the fetch layer is the only place that still wins. Other hosts keep the
+// harness attribution untouched.
 const zenNativeFetch = globalThis.fetch;
 let zenUserAgent;
 const zenFetch = (input, init) => {
     const url = typeof input === 'string'
         ? input
         : input instanceof URL ? input.href : input instanceof Request ? input.url : String(input);
-    if (zenUserAgent === undefined || !/opencode\.ai\//.test(url))
+    if (zenUserAgent === undefined || new URL(url).hostname !== 'opencode.ai')
         return zenNativeFetch(input, init);
     const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
     headers.set('user-agent', zenUserAgent);
     return zenNativeFetch(input, { ...init, headers });
 };
 /**
- * Model-visible description of a tool this harness cannot execute. Both
- * placeholders take no arguments, so a model that calls one wastes a round trip
- * at worst — it can never be mistaken for an action that would otherwise run.
+ * Model-visible description of a placeholder this harness cannot execute.
  */
 const ZEN_TOOL_TEXT = 'Requirement placeholder from OpenCode Zen: this harness cannot execute it.';
-const zenTool = (name) => ({
+const zenTool = (name, property) => ({
     name,
     description: ZEN_TOOL_TEXT,
-    // The gate rejects a tool whose schema declares no property at all, so every
-    // placeholder carries one required-shaped property. The model never needs to
-    // call these; the schema exists only to satisfy the fingerprint check.
-    parameters: { type: 'object', properties: { required: { type: 'string', description: ZEN_TOOL_TEXT } }, required: ['required'], additionalProperties: false },
+    parameters: { type: 'object', properties: { [property]: { type: 'string', description: ZEN_TOOL_TEXT } }, required: [property] },
 });
 /**
  * Zen's free tier is gated on the request fingerprint, and the checks are the
- * tool names: the list must offer `bash` and `read` (lowercase, by name alone —
- * the schemas are never inspected), alongside `stream: true` (both transports
+ * tool names: the list must offer `bash` and `read` with non-empty parameter
+ * schemas, alongside `stream: true` (both transports
  * hardcode that). Requests carrying fewer tools — compaction, session titles,
  * summaries, or any turn whose permissions cut the list down — are refused with
  * FreeTierError and the misleading "free tier can only be used from within
@@ -193,23 +194,26 @@ const zenTool = (name) => ({
  * stay first and only missing ones are appended, so a request that already
  * qualifies is untouched and the provider's prompt cache is not invalidated.
  */
-const ZEN_REQUIRED_TOOLS = ['bash', 'read'];
+const ZEN_REQUIRED_TOOLS = [['bash', 'command'], ['read', 'file_path']];
 // A declared tool whose schema names no property is rejected by the same check,
 // so every required name ends up with a non-empty `properties` map: an existing
 // declaration keeps its own properties and only gains one when it had none.
-const withProperty = (tool) => {
+const withProperty = (tool, property) => {
     const parameters = tool.parameters ?? {};
     const properties = parameters.properties;
     if (properties !== undefined && Object.keys(properties).length > 0)
         return tool;
-    return { ...tool, parameters: { ...parameters, type: 'object', properties: { required: { type: 'string', description: ZEN_TOOL_TEXT } }, ...(parameters.required === undefined ? {} : { required: parameters.required }) } };
+    return { ...tool, parameters: { ...parameters, type: 'object', properties: { [property]: { type: 'string', description: ZEN_TOOL_TEXT } } } };
 };
 export const requiredZenTools = (tools = []) => {
-    const filled = tools.map(tool => tool.name !== undefined && ZEN_REQUIRED_TOOLS.includes(tool.name) ? withProperty(tool) : tool);
+    const filled = tools.map(tool => {
+        const required = ZEN_REQUIRED_TOOLS.find(([name]) => name === tool.name);
+        return required === undefined ? tool : withProperty(tool, required[1]);
+    });
     const present = new Set(filled.map(tool => tool.name));
-    for (const name of ZEN_REQUIRED_TOOLS) {
+    for (const [name, property] of ZEN_REQUIRED_TOOLS) {
         if (!present.has(name))
-            filled.push(zenTool(name));
+            filled.push(zenTool(name, property));
     }
     return filled;
 };
@@ -305,14 +309,30 @@ const zenApi = {
     'openai-completions': zenStreamFor('openai-completions'),
     'openai-responses': zenStreamFor('openai-responses'),
 };
+const CATALOG_ATTEMPTS = 3;
+const CATALOG_TIMEOUT_MS = 20_000;
+const CATALOG_TOTAL_BUDGET_MS = 45_000;
+const sleep = (ms) => new Promise(resolve => { setTimeout(resolve, ms); });
+/** Fetch public catalog metadata with bounded retries before trying the disk cache. */
 async function fetchJson(url, headers) {
-    const response = await fetch(url, { headers, signal: AbortSignal.timeout(30_000) });
-    if (!response.ok)
-        throw new Error(`${url}: HTTP ${response.status}`);
-    const payload = await response.json();
-    if (!isRecord(payload))
-        throw new Error(`${url}: unexpected response shape`);
-    return payload;
+    const deadline = Date.now() + CATALOG_TOTAL_BUDGET_MS;
+    let lastError;
+    for (let attempt = 1; attempt <= CATALOG_ATTEMPTS; attempt += 1) {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        try {
+            const response = await fetch(url, { headers, signal: AbortSignal.timeout(Math.min(CATALOG_TIMEOUT_MS, remaining)) });
+            if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
+            const payload = await response.json();
+            if (!isRecord(payload)) throw new Error(`${url}: unexpected response shape`);
+            return payload;
+        }
+        catch (error) {
+            lastError = error;
+            if (attempt < CATALOG_ATTEMPTS) await sleep(250 * attempt);
+        }
+    }
+    throw lastError;
 }
 /** pi-ai's standard ladder keys (off = explicit close; the rest are depths). */
 const PI_LEVEL_KEYS = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
@@ -394,15 +414,13 @@ function buildModels(zenData, modelsById, userAgent) {
                 name: typeof metadata.name === 'string' ? metadata.name : id,
                 api,
                 provider: PROVIDER,
-                baseUrl: 'https://opencode.ai/inference/v1',
+                baseUrl: ZEN_BASE_URL,
                 headers: { 'User-Agent': userAgent },
                 reasoning: controllable,
                 ...(controllable ? { thinkingLevelMap: reasoningMapFor(levels, api) } : {}),
                 input: input.length > 0 ? input : ['text'],
                 cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-                // MiMo's backend serves 1M; models.dev only declares the 200K tier. The
-                // cap is client-side metadata, so declaring 1M here is what unlocks it —
-                // verified against the live endpoint at 320K prompt tokens (HTTP 200).
+                // Retain the locally verified DeepSeek budget and MiMo's 1M window.
                 contextWindow: id === 'deepseek-v4.1-flash-free' ? 1_000_000
                     : id === 'mimo-v2.6-flash-free' ? 1_048_576
                     : typeof limit?.context === 'number' ? limit.context : 1_048_576,
@@ -439,7 +457,36 @@ function configuredModels(scanned, settings) {
     }
     return { models, modelErrors, configuredMaxTokens };
 }
+/** A missing or unreadable public-metadata cache leaves the network scan responsible for the catalog. */
+async function readCatalogCache(cachePath) {
+    try {
+        const parsed = JSON.parse(await readFile(cachePath, 'utf8'));
+        if (!isRecord(parsed) || !Array.isArray(parsed.zen) || !isRecord(parsed.models) || typeof parsed.userAgent !== 'string') return undefined;
+        return { zen: parsed.zen, models: parsed.models, userAgent: parsed.userAgent };
+    }
+    catch (error) {
+        // A cache miss or corrupt public metadata is recoverable on the next successful scan.
+        return undefined;
+    }
+}
+/** Await the atomic cache write so mounting leaves no background filesystem work. */
+async function writeCatalogCache(cachePath, cache) {
+    const temporary = `${cachePath}.${randomUUID()}.tmp`;
+    try {
+        await mkdir(dirname(cachePath), { recursive: true });
+        await writeFile(temporary, JSON.stringify(cache), { flag: 'wx', mode: 0o600 });
+        await rename(temporary, cachePath);
+    }
+    catch (error) {
+        // Optional cache persistence cannot prevent a valid live catalog from loading.
+    }
+    finally {
+        try { await rm(temporary, { force: true }); }
+        catch (error) { /* A failed optional-cache cleanup must not fail catalog mounting. */ }
+    }
+}
 export async function apply(ctx, config) {
+    const cachePath = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'cache', `${name}-catalog.json`);
     // One-time: the Zen user-agent the transport forces on every opencode.ai/zen request.
     const opencodeVersion = await resolveOpenCodeVersion();
     const opencodeUserAgent = `opencode/${opencodeVersion}`;
@@ -456,7 +503,7 @@ export async function apply(ctx, config) {
         const piProvider = createProvider({
             id: PROVIDER,
             name: 'OpenCodeZenFree',
-            baseUrl: 'https://opencode.ai/inference/v1',
+            baseUrl: ZEN_BASE_URL,
             auth: { apiKey: { name: 'OpenCodeZenFree', resolve: ({ credential }) => Promise.resolve({
                         auth: credential?.key === undefined ? {} : { apiKey: credential.key },
                         source: 'OpenCodeZenFree',
@@ -517,24 +564,30 @@ export async function apply(ctx, config) {
     ctx.on('loader/volatile-update', () => {
         profiles = buildProfiles();
     });
-    // The catalog is fetched once at mount. Mount never awaits it: an unreachable
-    // upstream must not kill the plugin.
+    // Await the bounded initial scan before mount completes. An unreachable feed
+    // can use last-good public metadata without changing user model overrides.
     async function sync() {
-        const [zen, modelsDev] = await Promise.all([
-            fetchJson('https://opencode.ai/zen/v1/models', {
-                'User-Agent': opencodeUserAgent,
-                accept: 'application/json',
-            }),
-            fetchJson('https://models.dev/api.json', { accept: 'application/json' }),
-        ]);
-        if (!Array.isArray(zen.data))
-            throw new Error('zen models: unexpected response shape');
-        if (!isRecord(modelsDev.opencode) || !isRecord(modelsDev.opencode.models)) {
-            throw new Error('models.dev: no "opencode" provider');
+        const usable = (zen, models, userAgent) => {
+            const next = buildModels(zen, models, userAgent);
+            if (next.length === 0) throw new Error('no OpenCode Zen free models resolved');
+            return next;
+        };
+        let next;
+        try {
+            const [zen, modelsDev] = await Promise.all([
+                fetchJson(ZEN_CATALOG_URL, { 'User-Agent': opencodeUserAgent, accept: 'application/json' }),
+                fetchJson('https://models.dev/api.json', { accept: 'application/json' }),
+            ]);
+            if (!Array.isArray(zen.data)) throw new Error('zen models: unexpected response shape');
+            if (!isRecord(modelsDev.opencode) || !isRecord(modelsDev.opencode.models)) throw new Error('models.dev: no "opencode" provider');
+            next = usable(zen.data, modelsDev.opencode.models, opencodeUserAgent);
+            await writeCatalogCache(cachePath, { zen: zen.data, models: modelsDev.opencode.models, userAgent: opencodeUserAgent });
         }
-        const next = buildModels(zen.data, modelsDev.opencode.models, opencodeUserAgent);
-        if (next.length === 0) {
-            throw new Error('no OpenCode Zen free models resolved; keeping the previous catalog');
+        catch (error) {
+            const cached = await readCatalogCache(cachePath);
+            if (cached === undefined) throw error;
+            ctx.logger.warn('[%s] catalog fetch failed (%s); using the cached catalog', name, errorChain(error));
+            next = usable(cached.zen, cached.models, cached.userAgent);
         }
         if (deepEqualJson(next, scanned))
             return;
@@ -542,7 +595,7 @@ export async function apply(ctx, config) {
         profiles = buildProfiles();
         ctx.logger.info('[%s] synced %d free model(s): %s', name, scanned.length, scanned.map(model => model.id).join(', '));
     }
-    void sync().catch((error) => {
+    await sync().catch((error) => {
         ctx.logger.warn('[%s] initial catalog scan failed: %s', name, errorChain(error));
     });
 }

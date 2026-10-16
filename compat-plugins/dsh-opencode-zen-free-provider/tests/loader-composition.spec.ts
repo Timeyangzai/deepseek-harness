@@ -1,5 +1,5 @@
 /** Loader-backed Zen settings persist model edits and reach the real adapter metadata. */
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -19,21 +19,50 @@ afterEach(async () => {
   if (root !== undefined) await rm(root, { recursive: true, force: true })
   root = undefined
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 const provider = 'opencode-zen-free-provider'
 const id = 'deepseek-v4.1-flash-free'
 
-async function composition() {
-  vi.stubGlobal('fetch', vi.fn(async (input: string) => {
-    if (input === 'https://unpkg.com/opencode-ai@latest/package.json') return Response.json({ version: '1.19.0' })
-    if (input === 'https://opencode.ai/zen/v1/models') return Response.json({ data: [{ id }] })
-    if (input === 'https://models.dev/api.json') return Response.json({ opencode: { models: {
-      [id]: { name: 'DeepSeek V4.1 Flash Free', limit: { context: 200000, output: 32000 }, modalities: { input: ['text', 'image'] } },
-    } } })
-    throw new Error(`Unexpected test request: ${input}`)
-  }))
+type CatalogModel = {
+  name: string
+  limit: { context: number; output: number }
+  modalities: { input: string[] }
+  status?: string
+}
+type Options = {
+  extraModels?: Record<string, CatalogModel>
+  unavailable?: boolean
+  cached?: string
+  expectedCount?: number
+  failFirst?: boolean
+}
+
+async function composition(options: Options = {}) {
   root = await mkdtemp(join(tmpdir(), 'dsh-zen-settings-'))
+  vi.stubEnv('DSH_HOME', root)
+  const cachePath = join(root, 'cache', `${provider}-catalog.json`)
+  if (options.cached !== undefined) {
+    await mkdir(join(root, 'cache'))
+    await writeFile(cachePath, options.cached)
+  }
+  const models = {
+    [id]: { name: 'DeepSeek V4.1 Flash Free', limit: { context: 200000, output: 32000 }, modalities: { input: ['text', 'image'] } },
+    ...options.extraModels,
+  }
+  let attempts = 0
+  const fetch = vi.fn(async (input: string) => {
+    if (input === 'https://unpkg.com/opencode-ai@latest/package.json') return Response.json({ version: '1.19.0' })
+    if (input === 'https://opencode.ai/inference/v1/models') {
+      attempts++
+      if (options.unavailable || (options.failFirst && attempts === 1)) return Response.json({}, { status: 503 })
+      return Response.json({ data: [...Object.keys(models), 'jev-1.13-free', 'paid-model'].map(id => ({ id })) })
+    }
+    if (input === 'https://models.dev/api.json') return Response.json({ opencode: { models } })
+    throw new Error(`Unexpected test request: ${input}`)
+  })
+  vi.stubGlobal('fetch', fetch)
   const config = join(root, 'cordis.yml')
   await writeFile(config, '- id: llm\n  name: test-llm\n- id: zen-custom-entry\n  name: test-zen\n')
   const ctx = new Context()
@@ -56,8 +85,8 @@ async function composition() {
   ctx.loader.internal = internal
   const patchPath = await profileComposition(ctx, root, config)
   for (const entry of ctx.configEditor.entries()) await entry.fiber?.await()
-  await vi.waitFor(async () => { expect(await ctx.llm.listModels(provider)).toHaveLength(1) })
-  return { ctx, patchPath }
+  expect(await ctx.llm.listModels(provider)).toHaveLength(options.expectedCount ?? 1)
+  return { ctx, patchPath, cachePath, cacheDir: join(root, 'cache'), fetch }
 }
 
 it('publishes an editable schema, saves capacities live, and restores scanned defaults', async () => {
@@ -86,4 +115,67 @@ it('retains an explicit empty catalog and rejects invalid capacities before comm
   expect(await ctx.llm.listModels(provider)).toEqual([])
   await ctx.settings.mutate('zen-custom-entry', [{ op: 'unset', path: ['models'] }])
   expect(await ctx.llm.listModels(provider)).toHaveLength(1)
+})
+
+it('discovers new free models while preserving saved overrides and filtering unsupported catalog rows', async () => {
+  const { ctx } = await composition({ expectedCount: 4, extraModels: {
+    'muse-spark-1.3-contributor-free': { name: 'Muse Spark 1.3 Free', limit: { context: 1048576, output: 131072 }, modalities: { input: ['text', 'image', 'audio'] } },
+    'nemotron-3.5-super-vl-free': { name: 'Nemotron 3.5 Super VL Free', limit: { context: 1048576, output: 131072 }, modalities: { input: ['text', 'image'] } },
+    'nemotron-3.5-lightning-free': { name: 'Nemotron 3.5 Lightning Free', limit: { context: 262144, output: 262144 }, modalities: { input: ['text'] } },
+    'retired-free': { name: 'Retired', status: 'deprecated', limit: { context: 1000, output: 100 }, modalities: { input: ['text'] } },
+  } })
+  const catalog = await ctx.llm.discoverModels('zen-custom-entry', { provider })
+  expect(catalog).toMatchObject([
+    { id, contextWindow: 1000000, maxTokens: 256000 },
+    { id: 'muse-spark-1.3-contributor-free', contextWindow: 1048576, maxTokens: 131072, inputModalities: ['text', 'image'] },
+    { id: 'nemotron-3.5-super-vl-free', contextWindow: 1048576, maxTokens: 131072, inputModalities: ['text', 'image'] },
+    { id: 'nemotron-3.5-lightning-free', contextWindow: 262144, maxTokens: 262144, inputModalities: ['text'] },
+  ])
+  await ctx.settings.mutate('zen-custom-entry', [{ op: 'set', path: ['models'], value: [{ id, contextWindow: 950000, maxTokens: 256000 }] }])
+  expect(await ctx.llm.listModels(provider)).toHaveLength(1)
+  expect(await ctx.llm.resolveModelInfo(provider, id)).toMatchObject({ context: { contextWindow: 950000 }, defaultMaxTokens: 256000 })
+  expect(await ctx.llm.discoverModels('zen-custom-entry', { provider })).toEqual(catalog)
+  await ctx.settings.mutate('zen-custom-entry', [{ op: 'unset', path: ['models'] }])
+  expect(await ctx.llm.listModels(provider)).toHaveLength(4)
+})
+
+it('finishes persisting public catalog metadata before the Loader mount completes', async () => {
+  const { cachePath, cacheDir } = await composition()
+  const cached = JSON.parse(await readFile(cachePath, 'utf8'))
+  expect(cached).toMatchObject({ zen: [{ id }, { id: 'jev-1.13-free' }, { id: 'paid-model' }], models: { [id]: { limit: { context: 200000, output: 32000 } } }, userAgent: 'opencode/1.19.0' })
+  expect(await readdir(cacheDir)).toEqual([`${provider}-catalog.json`])
+})
+
+it('retries transient directory failures before saving a successful scan', async () => {
+  const { fetch } = await composition({ failFirst: true })
+  expect(fetch.mock.calls.filter(([url]) => url === 'https://opencode.ai/inference/v1/models')).toHaveLength(2)
+})
+
+it('uses last-good public metadata when the directory remains unavailable and still applies live edits', async () => {
+  const cached = JSON.stringify({ zen: [{ id }], models: { [id]: { name: 'Cached Flash', limit: { context: 200000, output: 32000 }, modalities: { input: ['text', 'image'] } } }, userAgent: 'opencode/1.19.0' })
+  const { ctx, fetch, cachePath } = await composition({ unavailable: true, cached })
+  expect(fetch.mock.calls.filter(([url]) => url === 'https://opencode.ai/inference/v1/models')).toHaveLength(3)
+  expect(await ctx.llm.resolveModelInfo(provider, id)).toMatchObject({ name: 'Cached Flash', context: { contextWindow: 1000000 } })
+  await ctx.settings.mutate('zen-custom-entry', [{ op: 'set', path: ['models'], value: [{ id, maxTokens: 64000 }] }])
+  expect(await ctx.llm.resolveModelInfo(provider, id)).toMatchObject({ defaultMaxTokens: 64000 })
+  expect(await readFile(cachePath, 'utf8')).toBe(cached)
+})
+
+it('does not invent models from a corrupt cache when all directory attempts fail', async () => {
+  const { ctx, cachePath } = await composition({ unavailable: true, cached: '{invalid', expectedCount: 0 })
+  expect(await ctx.llm.discoverModels('zen-custom-entry', { provider })).toEqual([])
+  expect(await readFile(cachePath, 'utf8')).toBe('{invalid')
+})
+
+it('pads absent and empty required tool schemas without changing existing declarations', () => {
+  const empty = { name: 'bash', description: 'Existing tool', parameters: { type: 'object' as const, properties: {} } }
+  const preserved = { name: 'read', description: 'Existing read', parameters: { type: 'object' as const, properties: { file_path: { type: 'string' as const } } } }
+  const padded = Zen.requiredZenTools([empty, preserved])
+  expect(padded).toMatchObject([{ name: 'bash', parameters: { properties: { command: { type: 'string' } } } }, preserved])
+  expect(padded[1]).toBe(preserved)
+  expect(empty.parameters.properties).toEqual({})
+  expect(Zen.requiredZenTools()).toMatchObject([
+    { name: 'bash', parameters: { properties: { command: { type: 'string' } }, required: ['command'] } },
+    { name: 'read', parameters: { properties: { file_path: { type: 'string' } }, required: ['file_path'] } },
+  ])
 })

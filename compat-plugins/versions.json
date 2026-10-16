@@ -4,12 +4,13 @@
   "dshPurge": "1.1.71",
   "dshPurgeCommit": "6c1d638d1bdcc45ede50fc30249c753d58122a51",
   "dshLiangshen": "0.4.6",
-  "opencodeZenFreeProvider": "0.1.23",
-  "opencodeZenStatus": "local-compatible-package; native model settings; near-1M input verified; 256K output parameter accepted",
+  "opencodeZenFreeProvider": "0.1.24",
+  "opencodeZenUpstreamCommit": "bd34803ac79f74d625f5e82372b9879212f3ad92",
+  "opencodeZenStatus": "local-compatible-package; native model settings and 1M/256K defaults retained; bounded startup scan and last-good catalog cache",
   "opencodeZenLocalPackage": "dsh-opencode-zen-free-provider",
   "opencodeZenPatch": "desktop-profile/patches/opencode-zen-free-provider-0.1.23-free-tier-gate.patch",
-  "opencodeZenPatchedEntrySha256": "5eb8cd0fbf85e5afe28366f1ae14854b8d514122e10761eb284e1884c7be0c5a",
+  "opencodeZenPatchedEntrySha256": "68094d2b0725a341a7ed804e7e17b8ce0e42a9dd6d339f94d39492b988d929f0",
   "disabledPurgePatches": [85, 86],
-  "verifiedDate": "2026-10-15",
+  "verifiedDate": "2026-10-16",
   "verifiedPlatform": "macOS arm64"
 }
