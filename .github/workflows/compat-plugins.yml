@@ -1,0 +1,40 @@
+name: Desktop compatibility plugins
+
+on:
+  pull_request:
+    paths:
+      - 'compat-plugins/**'
+      - '.github/workflows/compat-plugins.yml'
+  push:
+    branches: [master, codex/desktop-plugin-portability]
+    paths:
+      - 'compat-plugins/**'
+      - '.github/workflows/compat-plugins.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      DSH_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v5.0.0
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: '24'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:native-system
+      - run: pnpm exec tsc -b packages/util/atomic-write/tsconfig.json
+      - run: node --test compat-plugins/tests/install.test.mjs
+      - run: node --test compat-plugins/dsh-purge/tests/harness-021.test.mjs compat-plugins/dsh-purge/tests/steering.test.mjs
+      - run: pnpm exec vitest run --config compat-plugins/vitest.config.ts

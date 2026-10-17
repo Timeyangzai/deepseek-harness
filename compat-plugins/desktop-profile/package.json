@@ -4,7 +4,8 @@
   "dependencies": {
     "@jiesou/dsh-opencode-zen-free-provider": "file:../../local-plugins/dsh-opencode-zen-free-provider",
     "@linxin666/dsh-liangshen": "file:../../local-plugins/dsh-liangshen",
-    "dsh-purge": "file:../../local-plugins/dsh-purge"
+    "dsh-purge": "file:../../local-plugins/dsh-purge",
+    "dshmarket": "1.66.32"
   },
   "dsh": {
     "profile": {
@@ -14,7 +15,8 @@
         "dsh-purge",
         "@deepseek-ai/dsh-experimental-agent-team-profile",
         "@linxin666/dsh-liangshen",
-        "@jiesou/dsh-opencode-zen-free-provider"
+        "@jiesou/dsh-opencode-zen-free-provider",
+        "dshmarket"
       ]
     }
   }

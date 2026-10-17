@@ -6,11 +6,16 @@
   "dshLiangshen": "0.4.6",
   "opencodeZenFreeProvider": "0.1.24",
   "opencodeZenUpstreamCommit": "bd34803ac79f74d625f5e82372b9879212f3ad92",
-  "opencodeZenStatus": "local-compatible-package; native model settings and 1M/256K defaults retained; bounded startup scan and last-good catalog cache",
+  "opencodeZenStatus": "local-compatible-package; editable catalog; same-model bounded protocol recovery before content; no quota or credential retries",
   "opencodeZenLocalPackage": "dsh-opencode-zen-free-provider",
   "opencodeZenPatch": "desktop-profile/patches/opencode-zen-free-provider-0.1.23-free-tier-gate.patch",
-  "opencodeZenPatchedEntrySha256": "68094d2b0725a341a7ed804e7e17b8ce0e42a9dd6d339f94d39492b988d929f0",
-  "disabledPurgePatches": [85, 86],
-  "verifiedDate": "2026-10-16",
-  "verifiedPlatform": "macOS arm64"
+  "opencodeZenPatchedEntrySha256": "6d3843d45bfd7886f3830a40a28e975bf763b7de7ce3abd3a98a57d295d21994",
+  "disabledPurgePatches": [
+    85,
+    86
+  ],
+  "verifiedDate": "2026-10-17",
+  "verifiedPlatform": "Windows x64; macOS build unchanged, revalidation pending",
+  "dshmarket": "1.66.32",
+  "opencodeZenRecoveryPatch": "desktop-profile/patches/opencode-zen-free-provider-0.1.24-upstream-recovery.patch"
 }

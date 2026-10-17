@@ -44,6 +44,8 @@ apps/web/dist/
 .dsh-build/
 .dsh-report/
 .playwright-mcp/
+.playwright-cli/
+/output/
 .orig
 .worktrees/
 worktrees/

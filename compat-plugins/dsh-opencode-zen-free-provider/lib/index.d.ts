@@ -20,17 +20,21 @@ export interface Config {
     requestImageMaxBytes?: number;
     /** Provider-owned model-request retry policy; omission uses normal defaults. */
     retryPolicy?: RetryPolicyConfig;
+    /** Re-route the first refusal of a request instead of failing the turn (default true). */
+    upstreamRecovery?: boolean;
 }
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     models: z<ModelSettings[] | null, ModelSettings[] | null, "volatile-defined">;
     maxRequestImageBytes: z<number, number, "volatile-defined">;
     requestImageMaxBytes: z<number, number, "volatile-defined">;
     retryPolicy: z<NoInfer<RetryPolicyConfig>, NoInfer<RetryPolicyConfig>, "volatile">;
+    upstreamRecovery: z<boolean, boolean, "volatile-defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
     models: z<ModelSettings[] | null, ModelSettings[] | null, "volatile-defined">;
     maxRequestImageBytes: z<number, number, "volatile-defined">;
     requestImageMaxBytes: z<number, number, "volatile-defined">;
     retryPolicy: z<NoInfer<RetryPolicyConfig>, NoInfer<RetryPolicyConfig>, "volatile">;
+    upstreamRecovery: z<boolean, boolean, "volatile-defined">;
 }>>, "plain">;
 /**
  * {@link Config} as the Loader holds it: every field is volatile, so a settings write
@@ -39,5 +43,9 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
  */
 type LiveConfig = Schemastery.TypeT<typeof Config>;
 export declare const requiredZenTools: (tools?: readonly Tool[]) => Tool[];
+/** The refusal one stream event carries, when a different route may still answer. */
+export declare const recoverableUpstreamFailure: (event: unknown) => { type: string; code: string; message: string } | undefined;
+/** Run the attempts in order and hand the transport one stream for all of them. */
+export declare const withUpstreamRecovery: <Attempt, Stream extends { push: (event: unknown) => void; end?: () => void }>(plan: readonly Attempt[], invoke: (attempt: Attempt) => Stream, onSwitch: (from: Attempt, to: Attempt, failure: { type: string; message: string }) => void, signal?: AbortSignal) => Stream;
 export declare function apply(ctx: Context, config: LiveConfig): Promise<void>;
 export {};

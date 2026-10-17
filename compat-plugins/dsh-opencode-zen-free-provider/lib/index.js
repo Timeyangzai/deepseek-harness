@@ -52,6 +52,8 @@ export const Config = z.object({
     maxRequestImageBytes: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_REQUEST_IMAGE_BYTES).volatile(),
     requestImageMaxBytes: z.number().step(1).min(1).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_REQUEST_IMAGE_MAX_BYTES).volatile(),
     retryPolicy: RetryPolicySchema.volatile(),
+    // Re-route the first refusal of a request instead of failing the turn.
+    upstreamRecovery: z.boolean().default(true).volatile(),
 });
 /**
  * The committed configuration as plain mutable values. Unwrapping the references
@@ -63,6 +65,7 @@ function liveConfig(config) {
         maxRequestImageBytes: config.maxRequestImageBytes.get(),
         requestImageMaxBytes: config.requestImageMaxBytes.get(),
         retryPolicy: config.retryPolicy.get(),
+        upstreamRecovery: config.upstreamRecovery.get(),
     });
 }
 const isRecord = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -244,36 +247,123 @@ const normalizeReasoningContext = (context) => ({
 });
 // Zen reports non-credential refusals (ended free promotions, region blocks) as
 // HTTP 401/403, which the harness classifies as AUTH and masks as "API key is
-// invalid". Rewriting the envelope (e.g. `401: {"type":"ModelError",…}`) to
-// `[opencode-zen <type>] <message>` gets the real reason past that
-// classification; genuine auth envelopes and unparseable text pass through.
-const rewriteRefusalMessage = (errorMessage) => {
+// invalid". Rewriting the envelope to an [opencode-zen <type>] message gets the
+// real reason past that classification; genuine auth envelopes pass through.
+const parseRefusalEnvelope = (errorMessage) => {
+    const rewritten = /^\[opencode-zen ([^\]]+)\] (.*)$/s.exec(errorMessage);
+    if (rewritten !== null) return { type: rewritten[1], code: '', message: rewritten[2] };
     const start = errorMessage.indexOf('{');
     const end = errorMessage.lastIndexOf('}');
     if (start < 0 || end <= start)
-        return errorMessage;
+        return undefined;
     let parsed;
     try {
         parsed = JSON.parse(errorMessage.slice(start, end + 1));
     }
     catch {
-        return errorMessage;
+        return undefined;
     }
     if (!isRecord(parsed))
-        return errorMessage;
-    // Accept both the raw envelope (`{"type":"error","error":{…}}`) and the
-    // SDK-unwrapped inner object (`{"type":"ModelError","message":"…"}`).
-    const detail = parsed.type === 'error' && isRecord(parsed.error) ? parsed.error : parsed;
+        return undefined;
+    // Accept both the raw envelope and the SDK-unwrapped inner object.
+    const detail = isRecord(parsed.error) ? parsed.error : parsed;
     const message = [detail.message, isRecord(detail.error) ? detail.error.message : undefined, detail.detail]
         .find((value) => typeof value === 'string');
     if (message === undefined)
-        return errorMessage;
+        return undefined;
     const type = typeof detail.type === 'string' ? detail.type : 'Error';
     const code = typeof detail.code === 'string' ? detail.code : '';
-    if (AUTH_ERROR_TYPES.has(type) || AUTH_ERROR_TYPES.has(code))
+    return { type, code, message };
+};
+const rewriteRefusalMessage = (errorMessage) => {
+    const parsed = parseRefusalEnvelope(errorMessage);
+    if (parsed === undefined)
+        return errorMessage;
+    if (AUTH_ERROR_TYPES.has(parsed.type) || AUTH_ERROR_TYPES.has(parsed.code))
         return errorMessage;
     // Dropping the status prefix is what defeats the AUTH classifier.
-    return `[opencode-zen ${type}] ${message}`;
+    return '[opencode-zen ' + parsed.type + '] ' + parsed.message;
+};
+/**
+ * Server and protocol failures may allow the same model's alternate protocol.
+ * Authentication, free-tier admission and quota refusals remain final.
+ */
+const ZEN_RECOVERABLE_TYPES = new Set(['server_error', 'api_error', 'overloaded_error', 'RequestError', 'ModelError']);
+/**
+ * The refusal one stream event carries, when a different route may still answer.
+ * @param event - one stream event, as the transport pushes it.
+ * @returns the parsed refusal, or undefined when this event is not one to re-route.
+ */
+export const recoverableUpstreamFailure = (event) => {
+    if (!isRecord(event) || event.type !== 'error')
+        return undefined;
+    const errorMessage = isRecord(event.error) && typeof event.error.errorMessage === 'string' ? event.error.errorMessage : '';
+    const parsed = parseRefusalEnvelope(errorMessage);
+    if (parsed === undefined || AUTH_ERROR_TYPES.has(parsed.type) || AUTH_ERROR_TYPES.has(parsed.code)) return undefined;
+    if (ZEN_RECOVERABLE_TYPES.has(parsed.type))
+        return parsed;
+    return undefined;
+};
+/**
+ * Run the attempts in order and hand the transport one stream for all of them.
+ *
+ * Recovery is allowed only before content starts. An abandoned first stream must
+ * not close the outward iterator or result promise while the next attempt runs.
+ * Exhaustion or a synchronous factory failure preserves the last upstream error.
+ * @param plan - consecutive attempts, most preferred first.
+ * @param invoke - starts one attempt and returns its sanitized stream.
+ * @param onSwitch - reports one attempt switch to the caller's logger.
+ * @param signal - prevents another attempt after cancellation.
+ * @returns the stream the transport consumes.
+ */
+export const withUpstreamRecovery = (plan, invoke, onSwitch, signal) => {
+    if (plan.length === 0) throw new Error('OpenCode Zen recovery needs at least one attempt');
+    let rootPush;
+    const start = (index) => {
+        const stream = invoke(plan[index]);
+        const push = stream.push.bind(stream);
+        const forward = index === 0 ? push : rootPush;
+        let committed = false;
+        let retired = false;
+        let pendingStart;
+        stream.push = (event) => {
+            if (retired) return;
+            if (isRecord(event) && event.type === 'start' && !committed) {
+                pendingStart = event;
+                return;
+            }
+            if (!committed) {
+                const failure = recoverableUpstreamFailure(event);
+                if (failure !== undefined && !signal?.aborted && index + 1 < plan.length) {
+                    try {
+                        start(index + 1);
+                    }
+                    catch (error) {
+                        if (pendingStart !== undefined) forward(pendingStart);
+                        forward(event);
+                        retired = true;
+                        return;
+                    }
+                    retired = true;
+                    onSwitch(plan[index], plan[index + 1], failure);
+                    return;
+                }
+            }
+            committed = true;
+            if (pendingStart !== undefined) {
+                forward(pendingStart);
+                pendingStart = undefined;
+            }
+            forward(event);
+        };
+        if (index === 0) {
+            rootPush = push;
+            const end = stream.end?.bind(stream);
+            if (end !== undefined) stream.end = (...args) => { if (!retired) end(...args); };
+        }
+        return stream;
+    };
+    return start(0);
 };
 // Required by the adapter, unused by this route: the credential comes from
 // `resolveApiKey`, so pi-ai never stores one nor asks an ambient question.
@@ -296,19 +386,39 @@ const sanitizeStream = (stream) => {
     };
     return stream;
 };
-const zenStreamFor = (api) => api === 'openai-responses'
-    ? {
-        stream: (model, context, options) => sanitizeStream(piResponsesStream({ ...model, headers: zenApiHeaders(model, options) }, normalizeReasoningContext(context), { ...options, fetch: zenFetch })),
-        streamSimple: (model, context, options) => sanitizeStream(piResponsesStreamSimple({ ...model, headers: zenApiHeaders(model, options) }, normalizeReasoningContext(context), { ...options, fetch: zenFetch })),
+const zenInvoke = (api, kind, model, context, options) => {
+    const prepared = { ...model, headers: zenApiHeaders(model, options) };
+    const normalized = normalizeReasoningContext(context);
+    const run = { ...options, fetch: zenFetch };
+    if (api === 'openai-responses') {
+        return sanitizeStream(kind === 'simple'
+            ? piResponsesStreamSimple(prepared, normalized, run)
+            : piResponsesStream(prepared, normalized, run));
     }
-    : {
-        stream: (model, context, options) => sanitizeStream(piAgentStream({ ...model, headers: zenApiHeaders(model, options) }, normalizeReasoningContext(context), { ...options, fetch: zenFetch })),
-        streamSimple: (model, context, options) => sanitizeStream(piAgentStreamSimple({ ...model, headers: zenApiHeaders(model, options) }, normalizeReasoningContext(context), { ...options, fetch: zenFetch })),
-    };
-const zenApi = {
-    'openai-completions': zenStreamFor('openai-completions'),
-    'openai-responses': zenStreamFor('openai-responses'),
+    return sanitizeStream(kind === 'simple'
+        ? piAgentStreamSimple(prepared, normalized, run)
+        : piAgentStream(prepared, normalized, run));
 };
+/**
+ * At most two attempts retain the selected model and configured capacities.
+ */
+const zenAttempts = (model, recovery) => {
+    const plan = [{ model, api: model.api, label: model.id }];
+    if (!recovery.enabled)
+        return plan;
+    const variants = recovery.variants.get(model.id);
+    if (variants !== undefined) {
+        const other = model.api === 'openai-responses' ? 'openai-completions' : 'openai-responses';
+        const alternate = variants.get(other);
+        if (alternate !== undefined)
+            plan.push({ model: { ...model, api: other, compat: alternate.compat, thinkingLevelMap: alternate.thinkingLevelMap }, api: other, label: model.id + ' on ' + other });
+    }
+    return plan;
+};
+const zenStreamFor = (recovery, onSwitch) => ({
+    stream: (model, context, options) => withUpstreamRecovery(zenAttempts(model, recovery), (spec) => zenInvoke(spec.api, 'stream', spec.model, context, options), onSwitch, options?.signal),
+    streamSimple: (model, context, options) => withUpstreamRecovery(zenAttempts(model, recovery), (spec) => zenInvoke(spec.api, 'simple', spec.model, context, options), onSwitch, options?.signal),
+});
 const CATALOG_ATTEMPTS = 3;
 const CATALOG_TIMEOUT_MS = 20_000;
 const CATALOG_TOTAL_BUDGET_MS = 45_000;
@@ -370,9 +480,12 @@ function reasoningMapFor(levels, api) {
     }
     return map;
 }
-// Turn the live-scanned feeds into pi-ai model descriptors.
-function buildModels(zenData, modelsById, userAgent) {
+// Turn the live-scanned feeds into pi-ai model descriptors. Both transport
+// surfaces are built for every model id: the declared one is registered, and the
+// other stays available as a recovery attempt when the declared one refuses.
+function buildModels(zenData, modelsById, userAgent, zenVariants) {
     const baseModels = getBuiltinModels('opencode');
+    zenVariants.clear();
     return zenData
         .filter((entry) => isRecord(entry) && typeof entry.id === 'string' && entry.id.endsWith('-free'))
         .flatMap((entry) => {
@@ -382,26 +495,13 @@ function buildModels(zenData, modelsById, userAgent) {
             return [];
         if (typeof metadata.status === 'string' && metadata.status === 'deprecated')
             return [];
-        // Zen serves muse-spark contributor-free models on the Responses
-        // endpoint (`/zen/v1/responses`); chat/completions 500s for them.
-        const api = id.includes('muse-spark') ? 'openai-responses' : 'openai-completions';
+        // Zen serves muse-spark contributor-free models on the Responses endpoint
+        // (chat/completions 500s for them); every other free model is served on
+        // chat/completions. The other surface is still built, because an upstream
+        // that refuses one of them can still answer the other.
+        const declaredApi = id.includes('muse-spark') ? 'openai-responses' : 'openai-completions';
         const baseCompat = baseModels.find(base => base.id === id)?.compat;
-        // Models not yet in the pi-ai built-in catalogue still need the Zen-
-        // specific maxTokensField ("max_tokens") so the proxy does not reject
-        // the request with a 500 when "max_completion_tokens" arrives.
-        //
-        // `supportsStrictMode` is what makes pi-ai state `strict: false` on a
-        // Responses tool. Without that field the Responses API normalises the
-        // schema into strict mode, where every declared property counts as
-        // required and the model has to invent the optional arguments. Zen's own
-        // CLI writes the field on every OpenAI-wire tool for the same reason.
-        // Chat-completions models need nothing: pi-ai omits `strict` there, and
-        // that API stays non-strict by default.
-        const strictCompat = api === 'openai-responses' ? { supportsStrictMode: true } : {};
-        const compat = baseCompat === undefined
-            ? { maxTokensField: 'max_tokens', supportsReasoningEffort: false, ...strictCompat }
-            : { ...baseCompat, requiresReasoningContentOnAssistantMessages: false, ...strictCompat };
-        // No ladder upstream ⇒ no selector: `reasoning: false` means "no effort
+        // No ladder upstream means no selector: reasoning false is "no effort
         // control", never "no thinking".
         const levels = reasoningLevelsFor(metadata);
         const controllable = levels.length > 0;
@@ -409,7 +509,23 @@ function buildModels(zenData, modelsById, userAgent) {
         const input = isRecord(metadata.modalities) && Array.isArray(metadata.modalities.input)
             ? metadata.modalities.input.filter((value) => value === 'text' || value === 'image')
             : [];
-        return [{
+        const descriptor = (api) => {
+            // Models not yet in the pi-ai built-in catalogue still need the Zen-
+            // specific maxTokensField ("max_tokens") so the proxy does not reject
+            // the request with a 500 when "max_completion_tokens" arrives.
+            //
+            // supportsStrictMode is what makes pi-ai state strict: false on a
+            // Responses tool. Without that field the Responses API normalises the
+            // schema into strict mode, where every declared property counts as
+            // required and the model has to invent the optional arguments. Zen's
+            // own CLI writes the field on every OpenAI-wire tool for the same
+            // reason. Chat-completions models need nothing: pi-ai omits strict
+            // there, and that API stays non-strict by default.
+            const strictCompat = api === 'openai-responses' ? { supportsStrictMode: true } : {};
+            const compat = baseCompat === undefined
+                ? { maxTokensField: 'max_tokens', supportsReasoningEffort: false, ...strictCompat }
+                : { ...baseCompat, requiresReasoningContentOnAssistantMessages: false, ...strictCompat };
+            return {
                 id,
                 name: typeof metadata.name === 'string' ? metadata.name : id,
                 api,
@@ -427,7 +543,11 @@ function buildModels(zenData, modelsById, userAgent) {
                 maxTokens: id === 'deepseek-v4.1-flash-free' ? 256_000
                     : typeof limit?.output === 'number' ? limit.output : 32_768,
                 ...(compat ? { compat } : {}),
-            }];
+            };
+        };
+        const variants = new Map([['openai-completions', descriptor('openai-completions')], ['openai-responses', descriptor('openai-responses')]]);
+        zenVariants.set(id, variants);
+        return [variants.get(declaredApi)];
     });
 }
 /** Resolve an optional catalog replacement without changing the upstream transport metadata. */
@@ -491,6 +611,7 @@ export async function apply(ctx, config) {
     const opencodeVersion = await resolveOpenCodeVersion();
     const opencodeUserAgent = `opencode/${opencodeVersion}`;
     zenUserAgent = opencodeUserAgent;
+    const zenVariants = new Map();
     // The Loader owns the settings namespace, so the configuration form is
     // addressed by the profile entry id that mounted this plugin.
     const settingsNs = ctx.fiber.entry?.options.id ?? name;
@@ -500,6 +621,9 @@ export async function apply(ctx, config) {
     const buildProfiles = () => {
         const opts = liveConfig(config);
         const catalog = configuredModels(scanned, opts.models);
+        const recovery = { enabled: opts.upstreamRecovery, variants: zenVariants };
+        const onSwitch = (from, to, failure) => ctx.logger.warn('[%s] %s refused (%s: %s); retrying on %s', name, from.label, failure.type, failure.message, to.label);
+        const streamApi = zenStreamFor(recovery, onSwitch);
         const piProvider = createProvider({
             id: PROVIDER,
             name: 'OpenCodeZenFree',
@@ -509,7 +633,7 @@ export async function apply(ctx, config) {
                         source: 'OpenCodeZenFree',
                     }) } },
             models: catalog.models,
-            api: zenApi,
+            api: { 'openai-completions': streamApi, 'openai-responses': streamApi },
         });
         const profiles = new Map([[PROVIDER, {
                     provider: PROVIDER,
@@ -568,7 +692,7 @@ export async function apply(ctx, config) {
     // can use last-good public metadata without changing user model overrides.
     async function sync() {
         const usable = (zen, models, userAgent) => {
-            const next = buildModels(zen, models, userAgent);
+            const next = buildModels(zen, models, userAgent, zenVariants);
             if (next.length === 0) throw new Error('no OpenCode Zen free models resolved');
             return next;
         };
