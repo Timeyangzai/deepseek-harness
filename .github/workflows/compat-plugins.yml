@@ -34,7 +34,7 @@ jobs:
           node-version: '24'
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build:native-system
-      - run: pnpm exec tsc -b packages/util/atomic-write/tsconfig.json
+      - run: pnpm run build:lib:host
       - run: node --test compat-plugins/tests/install.test.mjs
       - run: node --test compat-plugins/dsh-purge/tests/harness-021.test.mjs compat-plugins/dsh-purge/tests/steering.test.mjs
       - run: pnpm exec vitest run --config compat-plugins/vitest.config.ts
