@@ -72,6 +72,43 @@ describe('unique object-name prefix search', () => {
 })
 
 describe('maintained repository reference policy', () => {
+  it('accepts unquoted integer field values that collide with commit prefixes', () => {
+    const identifier = '1'.repeat(7)
+    for (const source of [
+      `size = ${identifier}`,
+      `{ url = "https://example.invalid/package.whl", size = ${identifier}, hash = "sha256:example" }`,
+      `{"size": ${identifier}}`,
+      `  size: ${identifier} # bytes`,
+      `  - size: ${identifier}`,
+    ]) {
+      for (const file of ['dependencies.lock', 'manifest.json', 'config.yml', 'config.yaml', 'config.toml']) {
+        expect(findRepositoryReferences(file, source, new Set([identifier]))).toEqual([])
+      }
+    }
+  })
+
+  it('rejects numeric commit references in strings, URLs, and prose', () => {
+    const identifier = '1'.repeat(7)
+    for (const source of [
+      `revision = "${identifier}"`,
+      `revision: '${identifier}'`,
+      `https://example.invalid/commit/${identifier}`,
+      `Commit ${identifier}`,
+      identifier,
+    ]) {
+      for (const file of ['source.md', 'dependencies.lock']) {
+        expect(findRepositoryReferences(file, source, new Set([identifier])))
+          .toEqual([{ file, line: 1, kind: 'commit-hash' }])
+      }
+    }
+    expect(findRepositoryReferences('source.md', `Commit: ${identifier}`, new Set([identifier])))
+      .toEqual([{ file: 'source.md', line: 1, kind: 'commit-hash' }])
+    expect(findRepositoryReferences('dependencies.lock', `# commit: ${identifier}`, new Set([identifier])))
+      .toEqual([{ file: 'dependencies.lock', line: 1, kind: 'commit-hash' }])
+    expect(findRepositoryReferences('dependencies.lock', 'size = abcdef1', new Set(['abcdef1'])))
+      .toEqual([{ file: 'dependencies.lock', line: 1, kind: 'commit-hash' }])
+  })
+
   it('permits only the independent kit repository and its source URLs', () => {
     for (const suffix of ['', '.git', '/tree/main/packages/entry']) {
       expect(findRepositoryReferences('package.json', `${organizationUrl}/libreoffice-kit${suffix}`, new Set())).toEqual([])

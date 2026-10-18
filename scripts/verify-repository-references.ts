@@ -31,12 +31,21 @@ function isMaintained(file: string): boolean {
   return !excludedPrefixes.some(prefix => file.startsWith(prefix))
 }
 
+/** Unquoted integer field values in structured data do not identify Git objects. */
+function isIntegerField(file: string, line: string, match: RegExpExecArray): boolean {
+  return /\.(?:json|ya?ml|toml|lock)$/.test(file)
+    && /^\d+$/.test(match[0])
+    && /(?:^[ \t]*(?:-[ \t]+)?|[{,][ \t]*)(?:[A-Za-z_$][\w$.-]*|"[^"\r\n]+"|'[^'\r\n]+')[ \t]*[:=][ \t]*$/.test(line.slice(0, match.index))
+    && /^[ \t]*(?:[,}\]#]|$)/.test(line.slice(match.index + match[0].length))
+}
+
 /**
  * Inspect a maintained source file against known commit identifiers.
  * @param file - Repository-relative path used in diagnostics and exclusions.
  * @param source - File text or a symlink's stored target.
  * @param commits - Lowercase, unambiguous full or abbreviated commit identifiers.
- * @returns One finding per line and reference kind; digests and other Git object types are accepted.
+ * @returns One finding per line and reference kind; integer fields in structured data,
+ *   digests, and other Git object types are accepted.
  */
 export function findRepositoryReferences(
   file: string,
@@ -49,7 +58,8 @@ export function findRepositoryReferences(
     if (organizationUrl.test(canonicalReferenceText(line).replace(kitRepositoryUrl, ''))) {
       references.push({ file, line: index + 1, kind: 'organization-url' })
     }
-    if ([...line.matchAll(commitCandidate)].some(match => commits.has(match[0].toLowerCase()))) {
+    if ([...line.matchAll(commitCandidate)].some(match =>
+      commits.has(match[0].toLowerCase()) && !isIntegerField(file, line, match))) {
       references.push({ file, line: index + 1, kind: 'commit-hash' })
     }
   }
