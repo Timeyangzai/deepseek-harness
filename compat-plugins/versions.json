@@ -17,5 +17,5 @@
   "verifiedDate": "2026-10-18",
   "verifiedPlatform": "Windows x64 build and runtime verified; macOS packaging requires a Mac",
   "dshmarket": "1.66.37",
-  "opencodeZenRecoveryPatch": "desktop-profile/patches/opencode-zen-free-provider-0.1.25-rc2-compat.patch"
+  "opencodeZenRecoveryPatch": "desktop-profile/patches/opencode-zen-free-provider-0.1.24-upstream-recovery.patch"
 }
