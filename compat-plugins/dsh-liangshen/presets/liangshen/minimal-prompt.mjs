@@ -2,13 +2,13 @@
  * minimal-prompt — keep this preset's system prompt on the builtin Minimal
  * preset's one-line persona (plus the session's workspace directory) while the
  * sibling tool-catalog plugin owns the wire: one presentation declaration per
- * session ('native' | 'ptc' | 'both') and gentle paging for high-fan-out
+ * session ('native' | 'ptc') and gentle paging for high-fan-out
  * namespaces.
  *
  * The assembled prompt is filtered down to the persona section, plus the plan
  * policy when plan mode is active, plus the official PTC tool SDK sections
  * (`tools:sdk` and `tools:ptc-only`) exactly when the assembled wire carries
- * the `run_code` transport (presentations 'ptc' and 'both'; an unreadable wire
+ * the `run_code` transport (presentation 'ptc'; an unreadable wire
  * keeps them, matching the harness's own empty-section drop): the harness
  * identity, web-surface, tool-guidance, file-reference, and structured-output
  * sections never reach the model. Keeping the official SDK sections when the
@@ -97,7 +97,7 @@
 import { readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
-import { DISPATCHER_RULES } from './dispatcher-rules.mjs'
+import { DISPATCHER_RULES, DISPATCHER_RULES_APPENDIX, DISPATCHER_RULES_WITH_APPENDIX } from './dispatcher-rules.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'liangshen-minimal-prompt'
@@ -210,14 +210,21 @@ export const DISPATCHER_RULES_HEADING = [
 
 /**
  * Append the dispatcher block to the persona section text: the persona with
- * its workspace line, the heading, then the rule block. The block is prefixed
- * by the "additional material after the stable prompt prefix" clause so
- * DeepSeek's long-range attention keeps treating the rules as operative, which
- * is how the reference deployment renders them.
+ * its workspace line, the heading, then the rule block — the reference block
+ * with the local additions after it. The block is prefixed by the "additional
+ * material after the stable prompt prefix" clause so DeepSeek's long-range
+ * attention keeps treating the rules as operative, which is how the reference
+ * deployment renders them.
+ *
+ * The reference block and its additions are appended as one unit but checked
+ * separately, so a persona that already carries the reference text from
+ * somewhere else still gains the additions, and neither half is appended
+ * twice.
  */
 export function withDispatcherRules(text) {
-  if (text.includes(DISPATCHER_RULES)) return text
-  return `${text}${DISPATCHER_RULES_HEADING}${DISPATCHER_RULES}`
+  if (text.includes(DISPATCHER_RULES_WITH_APPENDIX)) return text
+  if (text.includes(DISPATCHER_RULES)) return `${text}\n${DISPATCHER_RULES_APPENDIX}`
+  return `${text}${DISPATCHER_RULES_HEADING}${DISPATCHER_RULES_WITH_APPENDIX}`
 }
 
 function optionalByteSize(value, field, fallback) {
@@ -797,7 +804,7 @@ export function apply(ctx, config) {
     const assembled = await next()
     if (!Array.isArray(assembled.sections)) return assembled
     // The official SDK sections belong to the run_code transport: keep them
-    // exactly when this assembly's wire carries it ('ptc' and 'both'), drop
+    // exactly when this assembly's wire carries it ('ptc'), drop
     // them from a native wire they would only confuse. An unreadable wire keeps
     // them, matching the harness's own empty-section drop under 'native'.
     const wire = Array.isArray(assembled?.tools) ? assembled.tools : undefined
@@ -807,7 +814,7 @@ export function apply(ctx, config) {
       ...(keepPlanPolicy ? [PLAN_POLICY_SECTION_NAME] : []),
       ...(wireHasRunCode ? PTC_SECTION_NAMES : []),
     ])
-    const sections = assembled.sections.filter(section => keep.has(section?.name) || String(section?.name || "").startsWith("dsh-purge") || String(section?.name || "").startsWith("dshpg-")) // [dsh-purge] liangshen keep operator
+    const sections = assembled.sections.filter(section => keep.has(section?.name) || String(section?.name || "").startsWith("dsh-purge") || String(section?.name || "").startsWith("dshpg-"))
     if (sections.length === 0) {
       warnOnce(`${name}: no section matched ${JSON.stringify([...keep])} — `
         + 'keeping the assembled prompt instead of sending an empty one')

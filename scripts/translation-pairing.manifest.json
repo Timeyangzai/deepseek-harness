@@ -1,5 +1,6 @@
 {
   "excluded": [
+    "compat-plugins/dsh-opencode-zen-free-provider/",
     "compat-plugins/dsh-purge/README.md",
     ".agents/notes/AGENTS.md",
     ".agents/notes/implemented/AGENTS.md",

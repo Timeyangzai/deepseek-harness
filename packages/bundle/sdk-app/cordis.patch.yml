@@ -1,5 +1,9 @@
 # The SDK application over dsh-base. Stdout belongs exclusively to JSON-RPC.
 
+- id: system-prompt
+  config:
+    personaPrefix: ""
+
 - id: session-title-llm
   disabled: true
 

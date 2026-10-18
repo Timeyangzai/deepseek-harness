@@ -36,5 +36,5 @@ jobs:
       - run: pnpm run build:native-system
       - run: pnpm run build:lib:host
       - run: node --test compat-plugins/tests/install.test.mjs
-      - run: node --test compat-plugins/dsh-purge/tests/harness-021.test.mjs compat-plugins/dsh-purge/tests/steering.test.mjs
+      - run: node --test compat-plugins/dsh-purge/tests/harness-021.test.mjs compat-plugins/dsh-purge/tests/steering.test.mjs compat-plugins/dsh-purge/tests/redteam-upgrade.test.mjs
       - run: pnpm exec vitest run --config compat-plugins/vitest.config.ts

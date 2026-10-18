@@ -6,6 +6,7 @@ window.__ModuleLoader__.load({
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 		let react = require("react");
 		let react_jsx_runtime = require("react/jsx-runtime");
+		let _deepseek_ai_dsh_client_store = require("@deepseek-ai/dsh-client-store");
 		//#region \0dsh-css:packages/dsh-liangshen/src/client/LiangShenLever.module.css.mjs
 		const css$1 = ".hYkIZq_lever{align-items:center;font-size:12px;line-height:1;display:inline-flex;position:relative}.hYkIZq_control{color:var(--dsw-alias-label-secondary,inherit);font:inherit;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;background:0 0;border:none;border-radius:999px;align-items:center;gap:6px;margin:0;padding:2px 8px 2px 4px;transition:background-color .16s,color .16s;display:inline-flex}.hYkIZq_control:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,#0000000f)}.hYkIZq_control:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,currentColor);outline-offset:2px}.hYkIZq_control:disabled{cursor:default;opacity:.55}.hYkIZq_track{background:linear-gradient(#2b2f36,#14161a);border-radius:8px;justify-content:center;align-items:flex-end;width:24px;height:28px;display:inline-flex;position:relative;overflow:hidden;box-shadow:inset 0 0 0 1px #ffffff24,inset 0 6px 10px #0000008c}.hYkIZq_track:after{content:\"\";background:#ffffff38;border-radius:2px;height:3px;position:absolute;bottom:2px;left:3px;right:3px}.hYkIZq_arm{transform-origin:50% 24px;width:16px;height:26px;margin-left:-8px;transition:transform .34s cubic-bezier(.2,1.7,.32,1);position:absolute;bottom:2px;left:50%;transform:rotate(-24deg)}.hYkIZq_lever[data-state=on] .hYkIZq_arm{transform:rotate(24deg)}.hYkIZq_rod{fill:#c9ced6;transition:fill .2s}.hYkIZq_knob{fill:#e04a33;stroke:#00000059;stroke-width:.6px;transition:fill .2s}.hYkIZq_lever[data-state=on] .hYkIZq_rod{fill:#ffd76a}.hYkIZq_lever[data-state=on] .hYkIZq_knob{fill:#f7c637}.hYkIZq_lever[data-state=on] .hYkIZq_track{box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l3,#0000001f), 0 0 10px #f7c6378c}.hYkIZq_lever[data-busy=true] .hYkIZq_arm{animation:.42s ease-in-out infinite hYkIZq_lever-jitter}.hYkIZq_readout{white-space:nowrap;letter-spacing:.02em;min-width:4.4em}.hYkIZq_lever[data-state=on] .hYkIZq_readout{color:var(--dsw-alias-label-primary,inherit);font-weight:600}.hYkIZq_error{background:var(--dsw-alias-bg-layer-3,#0000000f);max-width:22ch;color:var(--dsw-alias-state-error-primary,#c0392b);text-overflow:ellipsis;white-space:nowrap;border-radius:6px;margin-left:4px;padding:2px 6px;overflow:hidden}.hYkIZq_burst{z-index:60;pointer-events:none;place-items:center;display:grid;position:fixed;inset:0;overflow:hidden}.hYkIZq_flash{background:radial-gradient(circle at 50% 62%,#fff6c8eb,#ffd04a73 38%,#ffa00000 72%);animation:.72s ease-out both hYkIZq_burst-flash;position:absolute;inset:0}.hYkIZq_ring{border:6px solid #ffd65ad9;border-radius:50%;width:220px;height:220px;animation:1.1s cubic-bezier(.16,.9,.3,1) both hYkIZq_burst-ring;position:absolute}.hYkIZq_ring:nth-of-type(2){animation-delay:.12s}.hYkIZq_ring:nth-of-type(3){animation-delay:.24s}.hYkIZq_banner{color:#ffe9a8;text-align:center;background:linear-gradient(160deg,#181004f0,#402604eb);border-radius:22px;flex-direction:column;align-items:center;gap:6px;padding:22px 40px;animation:.6s cubic-bezier(.16,1.5,.3,1) both hYkIZq_banner-slam,.5s ease-in-out .6s 2 hYkIZq_banner-shake;display:flex;position:relative;box-shadow:0 0 0 2px #ffd65abf,0 24px 70px #00000073}.hYkIZq_bannerName{letter-spacing:.16em;background:linear-gradient(#fff6d0,#ffc93c 55%,#b8730a);color:#0000;text-shadow:0 0 24px #ffc93ca6;-webkit-background-clip:text;background-clip:text;font-size:44px;font-weight:800}.hYkIZq_line{letter-spacing:.08em;font-size:15px}.hYkIZq_code{font-family:var(--dsw-font-mono,ui-monospace, SFMono-Regular, Menlo, monospace);letter-spacing:.06em;opacity:.82;font-size:11px;animation:.5s steps(2,end) 6 hYkIZq_code-blink}.hYkIZq_sparks{place-items:center;display:grid;position:absolute;inset:0}.hYkIZq_spark{transform-origin:50%;background:linear-gradient(#ffeca0f2,#ffaa1400);border-radius:3px;grid-area:1/1;width:3px;height:30px;animation:.95s ease-out both hYkIZq_spark-fly}@keyframes hYkIZq_lever-jitter{0%,to{transform:rotate(-22deg)}50%{transform:rotate(-8deg)}}@keyframes hYkIZq_burst-flash{0%{opacity:0;transform:scale(.6)}18%{opacity:1}to{opacity:0;transform:scale(1.5)}}@keyframes hYkIZq_burst-ring{0%{opacity:.9;transform:scale(.2)}to{opacity:0;transform:scale(3.4)}}@keyframes hYkIZq_banner-slam{0%{opacity:0;transform:scale(3.6)rotate(-9deg)}55%{opacity:1;transform:scale(.94)rotate(1.5deg)}75%{transform:scale(1.06)rotate(-1deg)}to{opacity:1;transform:scale(1)rotate(0)}}@keyframes hYkIZq_banner-shake{0%,to{transform:translate(0)}25%{transform:translate(-9px)rotate(-.6deg)}75%{transform:translate(9px)rotate(.6deg)}}@keyframes hYkIZq_spark-fly{0%{opacity:0;transform:translateY(-40px)scaleY(.3)}18%{opacity:1}to{opacity:0;transform:translateY(-300px)scaleY(1.15)}}@keyframes hYkIZq_code-blink{0%,to{opacity:.35}50%{opacity:1}}@media (prefers-reduced-motion:reduce){.hYkIZq_arm,.hYkIZq_control,.hYkIZq_rod,.hYkIZq_knob{transition:none}.hYkIZq_lever[data-busy=true] .hYkIZq_arm,.hYkIZq_flash,.hYkIZq_ring,.hYkIZq_banner,.hYkIZq_code,.hYkIZq_spark{animation:none}.hYkIZq_burst{animation:.3s ease-out both hYkIZq_burst-flash}.hYkIZq_spark{display:none}}";
 		const tagId$1 = "@linxin666/dsh-liangshen/packages/dsh-liangshen/src/client/LiangShenLever.module.css";
@@ -271,19 +272,6 @@ window.__ModuleLoader__.load({
 			for (const row of Object.values(byId)) if (row !== void 0 && (row.retainedBy?.mainView ?? 0) > 0) return row.id;
 		}
 		//#endregion
-		//#region \0dsh-store-engine
-		const platform = ["@deepseek-ai/dsh-client", "-store"].join("");
-		const legacy = ["@deepseek-ai/dsh-client-runtime", "/client"].join("");
-		let engine;
-		try {
-			engine = require(platform);
-		} catch {
-			engine = require(legacy);
-		}
-		const createSnapshotStore = engine.createSnapshotStore;
-		engine.defineStore;
-		engine.shallowEqual;
-		//#endregion
 		//#region src/core/lever.ts
 		/**
 		* LiangShen lever logic — framework-free, no DOM, compiled by both programs.
@@ -369,7 +357,7 @@ window.__ModuleLoader__.load({
 				this.selectTimeoutMs = options.selectTimeoutMs ?? 1e4;
 				this.sessions = readService(() => ctx.sessions);
 				this.remote = readService(() => ctx.remote.agentPresets);
-				this.store = createSnapshotStore({
+				this.store = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)({
 					state: "off",
 					restoreLabel: "",
 					busy: false,
@@ -850,51 +838,6 @@ window.__ModuleLoader__.load({
 				}) : null]
 			});
 		}
-		/** A staged value field. `numeric` only hints the keypad: which drafts a field accepts is decided by its spec. */
-		function ValueField(props) {
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-				className: settings_card_module_css_default.field,
-				children: [
-					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-						className: settings_card_module_css_default.head,
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("label", {
-							className: settings_card_module_css_default.label,
-							htmlFor: props.id,
-							children: props.label
-						}), props.overridden ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
-							className: settings_card_module_css_default.badges,
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-								className: settings_card_module_css_default.badge,
-								children: props.overriddenLabel
-							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-								type: "button",
-								className: settings_card_module_css_default.reset,
-								disabled: props.disabled,
-								onClick: props.onReset,
-								children: props.resetLabel
-							})]
-						}) : null]
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
-						id: props.id,
-						className: props.invalid ? settings_card_module_css_default.inputInvalid : settings_card_module_css_default.input,
-						type: "text",
-						...props.numeric === true ? { inputMode: "numeric" } : {},
-						...props.invalid ? { "aria-invalid": true } : {},
-						value: props.text,
-						placeholder: props.placeholder ?? "",
-						disabled: props.disabled,
-						onChange: (event) => {
-							props.onEdit(event.target.value);
-						}
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-						className: props.invalid ? settings_card_module_css_default.invalid : settings_card_module_css_default.hint,
-						children: props.invalid ? props.invalidLabel : props.hint
-					})
-				]
-			});
-		}
 		const NON_SKIN_BODY_MARKERS = /* @__PURE__ */ new Set(["dshSkinCenter", "dshSidebarCollapsed"]);
 		function isSkinActive() {
 			return Object.keys(document.body.dataset).some((key) => key.startsWith("dsh") && !NON_SKIN_BODY_MARKERS.has(key));
@@ -1162,26 +1105,6 @@ window.__ModuleLoader__.load({
 		}
 		//#endregion
 		//#region src/client/settings-form.ts
-		/** A whole- or decimal-number field. An empty draft clears the field; any other draft that is not a finite number within the constraints blocks the save. */
-		function numberField(field, constraints = {}) {
-			const { integer = false, min } = constraints;
-			return {
-				field,
-				format: (value) => typeof value === "number" ? String(value) : "",
-				parse: (text) => {
-					const trimmed = text.trim();
-					if (trimmed === "") return { kind: "clear" };
-					const parsed = Number(trimmed);
-					if (!Number.isFinite(parsed)) return void 0;
-					if (integer && !Number.isInteger(parsed)) return void 0;
-					if (min !== void 0 && parsed < min) return void 0;
-					return {
-						kind: "set",
-						value: parsed
-					};
-				}
-			};
-		}
 		/** A boolean field, edited through true/false draft text. */
 		function booleanField(field) {
 			return {
@@ -1256,7 +1179,7 @@ window.__ModuleLoader__.load({
 			}
 			/** Publish a projection of this form, rebuilt whenever the form or a draft changes. */
 			bind(project) {
-				const store = createSnapshotStore(project());
+				const store = (0, _deepseek_ai_dsh_client_store.createSnapshotStore)(project());
 				this.listeners.add(() => {
 					store.set(project());
 				});
@@ -1492,17 +1415,7 @@ window.__ModuleLoader__.load({
 		//#endregion
 		//#region src/client/LiangShenSettingsCard.tsx
 		/** Wire presentations the tool catalog accepts (mirrors the Host schema). */
-		const PRESENTATION_CHOICES = [
-			"ptc",
-			"native",
-			"both"
-		];
-		/** Sensitivity presets for the circuit breaker (mirrors the Host schema). */
-		const SENSITIVITY_CHOICES = [
-			"conservative",
-			"balanced",
-			"aggressive"
-		];
+		const PRESENTATION_CHOICES = ["ptc", "native"];
 		/** Bridges the `liangshen` settings form onto the card's staged form. */
 		var LiangShenSettingsCardController = class {
 			form;
@@ -1513,21 +1426,7 @@ window.__ModuleLoader__.load({
 					booleanField("enabled"),
 					booleanField("announceToAgent"),
 					choiceField("presentation", PRESENTATION_CHOICES),
-					booleanField("dispatcher"),
-					booleanField("guardEnabled"),
-					choiceField("guardSensitivity", SENSITIVITY_CHOICES),
-					numberField("guardStallReasoningChars", {
-						integer: true,
-						min: 200
-					}),
-					numberField("guardGlobalStallCap", {
-						integer: true,
-						min: 2
-					}),
-					numberField("guardEchoFailures", {
-						integer: true,
-						min: 2
-					})
+					booleanField("dispatcher")
 				]);
 				this.store = this.form.bind(() => this.projection());
 			}
@@ -1537,12 +1436,7 @@ window.__ModuleLoader__.load({
 					enabled: this.form.field("enabled"),
 					announceToAgent: this.form.field("announceToAgent"),
 					presentation: this.form.field("presentation"),
-					dispatcher: this.form.field("dispatcher"),
-					guardEnabled: this.form.field("guardEnabled"),
-					guardSensitivity: this.form.field("guardSensitivity"),
-					guardStallReasoningChars: this.form.field("guardStallReasoningChars"),
-					guardGlobalStallCap: this.form.field("guardGlobalStallCap"),
-					guardEchoFailures: this.form.field("guardEchoFailures")
+					dispatcher: this.form.field("dispatcher")
 				};
 			}
 			/**
@@ -1648,83 +1542,6 @@ window.__ModuleLoader__.load({
 						onReset: () => {
 							props.resetField("dispatcher");
 						}
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(BooleanField, {
-						id: "settings-liangshen-guard-enabled",
-						label: t("settings.guardEnabled"),
-						hint: t("settings.guardEnabledHint"),
-						onLabel: t("settings.on"),
-						offLabel: t("settings.off"),
-						...fieldProps,
-						...state.guardEnabled,
-						onEdit: (text) => {
-							props.edit("guardEnabled", text);
-						},
-						onReset: () => {
-							props.resetField("guardEnabled");
-						}
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ChoiceField, {
-						id: "settings-liangshen-guard-sensitivity",
-						label: t("settings.guardSensitivity"),
-						hint: t("settings.guardSensitivityHint"),
-						choices: SENSITIVITY_CHOICES.map((choice) => ({
-							value: choice,
-							label: t(`sensitivity.${choice}`)
-						})),
-						...fieldProps,
-						...state.guardSensitivity,
-						onEdit: (text) => {
-							props.edit("guardSensitivity", text);
-						},
-						onReset: () => {
-							props.resetField("guardSensitivity");
-						}
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ValueField, {
-						id: "settings-liangshen-guard-stall-chars",
-						numeric: true,
-						label: t("settings.guardStallChars"),
-						hint: t("settings.guardStallCharsHint"),
-						placeholder: t("settings.guardAdaptive"),
-						...fieldProps,
-						...state.guardStallReasoningChars,
-						onEdit: (text) => {
-							props.edit("guardStallReasoningChars", text);
-						},
-						onReset: () => {
-							props.resetField("guardStallReasoningChars");
-						}
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ValueField, {
-						id: "settings-liangshen-guard-global-cap",
-						numeric: true,
-						label: t("settings.guardGlobalCap"),
-						hint: t("settings.guardGlobalCapHint"),
-						placeholder: t("settings.guardAdaptive"),
-						...fieldProps,
-						...state.guardGlobalStallCap,
-						onEdit: (text) => {
-							props.edit("guardGlobalStallCap", text);
-						},
-						onReset: () => {
-							props.resetField("guardGlobalStallCap");
-						}
-					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ValueField, {
-						id: "settings-liangshen-guard-echo",
-						numeric: true,
-						label: t("settings.guardEchoFailures"),
-						hint: t("settings.guardEchoFailuresHint"),
-						placeholder: t("settings.guardAdaptive"),
-						...fieldProps,
-						...state.guardEchoFailures,
-						onEdit: (text) => {
-							props.edit("guardEchoFailures", text);
-						},
-						onReset: () => {
-							props.resetField("guardEchoFailures");
-						}
 					})
 				]
 			});
@@ -1760,7 +1577,7 @@ window.__ModuleLoader__.load({
 			"settings.announceToAgent": "向 agent 公告本插件",
 			"settings.announceToAgentHint": "开启后向每一轮 agent 系统提示注入本插件公告；默认关闭以保持提示词干净。",
 			"settings.presentation": "工具面呈现方式",
-			"settings.presentationHint": "写入本插件声明的预设的 tool-catalog 行：both（出厂默认）让原生清单与 run_code 同驻（原生直调优先）；native 保持原生工具清单；ptc 把 wire 收拢为 run_code。改动立即生效，但已开始的会话保持其已声明的组合。",
+			"settings.presentationHint": "写入本插件声明的预设的 tool-catalog 行：ptc（出厂默认）把 wire 收拢为 run_code，其余工具经生成的 SDK 调用；native 保持原生工具清单。改动立即生效，但已开始的会话保持其已声明的组合。",
 			"settings.dispatcher": "调度者身份",
 			"settings.dispatcherHint": "开启后本模式按调度 Agent 工作：先分诊复杂度（L0/L1 直接执行，L2 走完整流程），L2 任务先澄清访谈再规划，由主代理派发子代理并逐层审查与验收。与工具面呈现方式无关，只决定身份与流程纪律。出厂默认开启；关闭后回到仅含工作纪律的极简 persona。",
 			"settings.on": "开",
@@ -1779,22 +1596,7 @@ window.__ModuleLoader__.load({
 			"settings.saveFailed": "部署未接受这些值，已保留供你修改。",
 			"settings.invalidValue": "该取值不被接受",
 			"presentation.ptc": "ptc（仅 run_code）",
-			"presentation.native": "native（原生工具清单）",
-			"presentation.both": "both（两者同驻）",
-			"settings.guardEnabled": "启用退化熔断器",
-			"settings.guardEnabledHint": "运行时检测思考退化（连续零产出长思考 / 同参重复失败），触发时注入熔断提示；仅停摆信号额外临时下调推理档位（max→high，不下探到甜区以下）。关闭后不干预任何请求。",
-			"settings.guardStallChars": "单步暴走字符阈值",
-			"settings.guardStallCharsHint": "留空即按推理档位自适应：max 档 8000 / high 档 12000 / low 档 20000 字符（按 V4.1 官方 384K 最大输出校准，约 2-4K 思考 token），再按灵敏度预设缩放。填写本字段则以该固定值覆盖所有档位。",
-			"settings.guardGlobalCap": "慢烧连续步数",
-			"settings.guardGlobalCapHint": "留空即按灵敏度预设缩放（均衡档为 4）；provider 不持久化推理文本的会话也以此为兜底步骤计数。填写本字段则以该固定值覆盖。步数越小越敏感，真实长调查建议调大。",
-			"settings.guardSensitivity": "熔断灵敏度",
-			"settings.guardSensitivityHint": "整体缩放熔断阈值：保守（更少打断，阈值×1.5）、均衡（出厂校准值）、激进（更早触发，阈值×0.5）。仅在对应细调字段留空时生效——阈值随推理档位自适应：max 档 8000 / high 档 12000 / low 档 20000 字符。",
-			"sensitivity.conservative": "保守（少打断）",
-			"sensitivity.balanced": "均衡（默认）",
-			"sensitivity.aggressive": "激进（早触发）",
-			"settings.guardEchoFailures": "同参连续失败次数",
-			"settings.guardEchoFailuresHint": "留空即按灵敏度预设缩放（均衡档为 3）；填写本字段则以该固定值覆盖。空转信号只注入熔断消息，不下调推理档位。",
-			"settings.guardAdaptive": "自适应"
+			"presentation.native": "native（原生工具清单）"
 		};
 		/** English counterpart; the key set mirrors {@link zh} exactly. */
 		const en = {
@@ -1820,7 +1622,7 @@ window.__ModuleLoader__.load({
 			"settings.announceToAgent": "Announce this plugin to agents",
 			"settings.announceToAgentHint": "Adds this plugin announcement to every agent system prompt; off by default so prompts stay clean.",
 			"settings.presentation": "Wire presentation",
-			"settings.presentationHint": "Written into the tool-catalog row of the preset this plugin declares: both (the shipped default) keeps the roster and run_code co-resident (direct native calls first); native keeps the native roster; ptc collapses the wire to run_code. A change re-declares the preset immediately; sessions that already started keep the composition they declared.",
+			"settings.presentationHint": "Written into the tool-catalog row of the preset this plugin declares: ptc (the shipped default) collapses the wire to run_code with every other tool reached through the generated SDK; native keeps the native roster. A change re-declares the preset immediately; sessions that already started keep the composition they declared.",
 			"settings.dispatcher": "Dispatcher identity",
 			"settings.dispatcherHint": "When on, the mode works as a dispatcher agent: it triages complexity first (L0/L1 work is done directly, an L2 task runs the full flow), clarifies an L2 task through an interview before planning, and the lead agent dispatches subagents and reviews and accepts them layer by layer. It is unrelated to the wire presentation and decides identity and process discipline only. On by default; switching it off returns the prompt to the bare persona with its working discipline.",
 			"settings.on": "On",
@@ -1839,22 +1641,7 @@ window.__ModuleLoader__.load({
 			"settings.saveFailed": "The deployment did not accept these values; they were left for you to correct.",
 			"settings.invalidValue": "The value is not accepted",
 			"presentation.ptc": "ptc (run_code only)",
-			"presentation.native": "native (native tool roster)",
-			"presentation.both": "both (both co-resident)",
-			"settings.guardEnabled": "Degeneration circuit breaker",
-			"settings.guardEnabledHint": "Detects reasoning degeneration at runtime (consecutive zero-output long reasoning / repeated identical-argument failures) and injects a breaker message; only a stall also steps the reasoning effort down (max to high, never below the sweet spot). Disabled means requests are never touched.",
-			"settings.guardStallChars": "Runaway reasoning character floor",
-			"settings.guardStallCharsHint": "Leave empty to adapt to the reasoning effort: 8000 at max / 12000 at high / 20000 at low characters (calibrated against V4.1's official 384K max output, roughly 2-4K thinking tokens), then scaled by the sensitivity preset. Setting a value pins it for every effort level.",
-			"settings.guardGlobalCap": "Slow-burn step count",
-			"settings.guardGlobalCapHint": "Leave empty to scale with the sensitivity preset (4 at balanced); it is also the fallback step count for a session whose provider persists no reasoning text. Setting a value pins it. Lower is more sensitive — raise it for genuinely long investigations.",
-			"settings.guardSensitivity": "Breaker sensitivity",
-			"settings.guardSensitivityHint": "Scales every breaker threshold: conservative (fewer interruptions, x1.5), balanced (the calibrated defaults), aggressive (fires earlier, x0.5). It applies only where the matching fine-tuning field is left empty — thresholds adapt to the reasoning effort: 8000 at max / 12000 at high / 20000 at low.",
-			"sensitivity.conservative": "Conservative (fewer interruptions)",
-			"sensitivity.balanced": "Balanced (default)",
-			"sensitivity.aggressive": "Aggressive (fires earlier)",
-			"settings.guardEchoFailures": "Identical-argument failures",
-			"settings.guardEchoFailuresHint": "Leave empty to scale with the sensitivity preset (3 at balanced); setting a value pins it. An echo only injects the breaker message — it never steps the reasoning effort down.",
-			"settings.guardAdaptive": "Adaptive"
+			"presentation.native": "native (native tool roster)"
 		};
 		//#endregion
 		//#region src/client/plugin-card-seat.ts
@@ -1993,8 +1780,7 @@ window.__ModuleLoader__.load({
 				base: void 0,
 				user: void 0,
 				revision: void 0,
-				writable: false,
-				mode: "host"
+				writable: false
 			};
 		}
 		/**

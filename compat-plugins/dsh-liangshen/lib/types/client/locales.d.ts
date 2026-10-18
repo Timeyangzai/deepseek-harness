@@ -47,21 +47,6 @@ export declare const zh: {
     'settings.invalidValue': string;
     'presentation.ptc': string;
     'presentation.native': string;
-    'presentation.both': string;
-    'settings.guardEnabled': string;
-    'settings.guardEnabledHint': string;
-    'settings.guardStallChars': string;
-    'settings.guardStallCharsHint': string;
-    'settings.guardGlobalCap': string;
-    'settings.guardGlobalCapHint': string;
-    'settings.guardSensitivity': string;
-    'settings.guardSensitivityHint': string;
-    'sensitivity.conservative': string;
-    'sensitivity.balanced': string;
-    'sensitivity.aggressive': string;
-    'settings.guardEchoFailures': string;
-    'settings.guardEchoFailuresHint': string;
-    'settings.guardAdaptive': string;
 };
 /** English counterpart; the key set mirrors {@link zh} exactly. */
 export declare const en: Record<keyof typeof zh, string>;

@@ -2,16 +2,16 @@
 
 [English](README.md) | 中文
 
-本目录保存 Harness `0.2.1-alpha.2` 使用的三个兼容插件副本和固定版本的 dshmarket 配置，供 Windows 与 macOS 共用。[Desktop](../apps/desktop/README.zh.md) 继续负责平台打包、签名和运行时；这里不包含应用安装包。
+本目录保存 Harness `0.2.1-rc.2` 使用的三个兼容插件副本和固定版本的 dshmarket 配置，供 Windows 与 macOS 共用。[Desktop](../apps/desktop/README.zh.md) 继续负责平台打包、签名和运行时；这里不包含应用安装包。
 
 ## 插件
 
 | 插件 | 版本 | 本地行为 |
 | --- | --- | --- |
-| dsh-purge | 1.1.71 | 兼容提示词、实时回退和源码桌面入口；排除 #85/#86，保留官方插话与排队 |
-| dsh-liangshen | 0.4.6 | 移除废弃的子代理后台配置，由插件注册预设 |
-| OpenCode Zen Free | 0.1.24 | 原生模型编辑、目录缓存、连接兼容与同模型协议恢复 |
-| dshmarket | 1.66.32 | npm 固定版本；在「设置 → 插件市场」管理社区插件 |
+| dsh-purge | 1.1.71 | 兼容提示词、实时回退和源码桌面入口；排除 #85/#86，保留官方插话与排队；修复红队废弃的子代理配置并保留 maxDepth |
+| dsh-liangshen | 0.4.7 | 上游 rc.2 预设支持；保留 Purge 提示词段落 |
+| OpenCode Zen Free | 0.1.25 | 原生模型编辑、目录缓存、连接兼容与同模型协议恢复 |
+| dshmarket | 1.66.37 | npm 固定版本；在「设置 → 插件市场」管理社区插件 |
 
 来源和校验值见 [versions.json](versions.json)。原样保留的第三方 README 使用上游文件名，不参加主仓库的双语配对。
 
@@ -42,7 +42,7 @@ pnpm 失败时恢复原 manifest 和已有 lockfile，并报告备份位置；�
 
 在「设置 → 模型 → OpenCode Zen Free → 编辑」展开模型行，可修改上下文、输出上限和文本/图片输入，容量支持 K/M 后缀。保存只写插件 `models`；恢复默认会移除覆盖并使用扫描目录。显式列表替换可选目录；「获取可用模型」仍可发现新增型号。
 
-DeepSeek Free 默认上下文 1,000,000、输出上限 256,000，输入和输出共享容量；输出值是请求参数，不保证生成满该长度。其他型号保留各自目录参数。
+DeepSeek Free 默认上下文 1,000,000、输出上限 256,000，输入和输出共享容量；输出值是请求参数，不保证生成满该长度。GLM Flash Free 采用上游 614,400 token 上下文限制。其他型号保留各自目录参数。
 
 目录在挂载时从 Zen 和 models.dev 读取；每个目录最多三次尝试，单次最多 20 秒，总预算 45 秒。成功元数据写入 `$DSH_HOME/cache/opencode-zen-free-provider-catalog.json`；网络失败可使用上次成功缓存，无缓存时记录警告并保留空目录。目录中有模型不代表推理端点当前可用。
 
@@ -64,7 +64,7 @@ DeepSeek Free 默认上下文 1,000,000、输出上限 256,000，输入和输出
 
 ```sh
 node --test compat-plugins/tests/install.test.mjs
-node --test compat-plugins/dsh-purge/tests/harness-021.test.mjs compat-plugins/dsh-purge/tests/steering.test.mjs
+node --test compat-plugins/dsh-purge/tests/harness-021.test.mjs compat-plugins/dsh-purge/tests/steering.test.mjs compat-plugins/dsh-purge/tests/redteam-upgrade.test.mjs
 pnpm exec vitest run --config compat-plugins/vitest.config.ts
 ```
 

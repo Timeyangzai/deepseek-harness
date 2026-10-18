@@ -205,10 +205,20 @@ function renderToolsPackage(text) {
 /**
  * 自愈：指挥职责标题 + 在 Agent Teams profile 下强制重新启用 classic subagent。
  * 不整份覆盖用户预设，只改会让派活失败的几处。
+ * @param text - Existing user preset YAML.
+ * @returns Updated YAML and whether a supported compatibility repair changed it.
  */
-function repairDelegation(text) {
+export function repairDelegation(text) {
   let next = String(text || "")
   let changed = false
+  // Released Harness presets select child composition through agentPreset.
+  const compatible = next
+    .replace(/^[ \t]+(?:backgroundMode|enableRunInBackground):[^\n]*\n/gm, '')
+    .replace(/^([ \t]+)toolFilter:[^\n]*\n(?:\1[ \t]+[^\n]*\n)*/gm, '')
+  if (compatible !== next) {
+    next = compatible
+    changed = true
+  }
   if (next.includes("## 你是谁、你不做什么")) {
     next = next.split("## 你是谁、你不做什么").join("## 指挥职责（硬约束）")
     changed = true

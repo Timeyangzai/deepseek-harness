@@ -26,7 +26,7 @@ function mount(options: { user?: JsonValue; role?: string; readOnly?: boolean; c
     user: options.user ?? { imageLimit: 123 }, base: {}, value: { models: null, imageLimit: 123 },
   }
   const operations = {
-    describeCredential: vi.fn(async () => undefined), storeCredential: vi.fn(async () => undefined),
+    storeCredential: vi.fn(async () => undefined),
     removeCredential: vi.fn(async () => undefined),
     writeSettings: vi.fn(async () => ({ kind: 'written' as const, view: namespace })),
     discoverModels: vi.fn(async () => ({ kind: 'found' as const, models: catalog })),
@@ -44,7 +44,6 @@ it.each([en, zh])('edits discovered capacities without exposing unrelated settin
   await screen.findByDisplayValue(catalog[0]!.id)
   expect(screen.queryByLabelText(copy.keyInput)).toBeNull()
   expect(screen.queryByLabelText(copy.baseUrl)).toBeNull()
-  expect(operations.describeCredential).not.toHaveBeenCalled()
   fireEvent.click(screen.getByLabelText(`${copy.modelAdvanced} 1`))
   expect(screen.getByLabelText<HTMLInputElement>(`${copy.contextWindow} 1`).value).toBe('1M')
   await expect(`${document.body.textContent}\n`).toMatchFileSnapshot(`./expected/catalog-provider-${copy === en ? 'en' : 'zh'}.txt`)

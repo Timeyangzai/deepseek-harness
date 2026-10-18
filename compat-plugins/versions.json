@@ -1,21 +1,21 @@
 {
-  "harness": "0.2.1-alpha.2",
-  "harnessRelease": "dsh-v0.2.1-alpha.2",
+  "harness": "0.2.1-rc.2",
+  "harnessRelease": "dsh-v0.2.1-rc.2",
   "dshPurge": "1.1.71",
   "dshPurgeCommit": "6c1d638d1bdcc45ede50fc30249c753d58122a51",
-  "dshLiangshen": "0.4.6",
-  "opencodeZenFreeProvider": "0.1.24",
-  "opencodeZenUpstreamCommit": "bd34803ac79f74d625f5e82372b9879212f3ad92",
+  "dshLiangshen": "0.4.7",
+  "opencodeZenFreeProvider": "0.1.25",
+  "opencodeZenUpstreamCommit": "6c44a64844c7c4e4128f080214853ae82e7e9a3b",
   "opencodeZenStatus": "local-compatible-package; editable catalog; same-model bounded protocol recovery before content; no quota or credential retries",
   "opencodeZenLocalPackage": "dsh-opencode-zen-free-provider",
   "opencodeZenPatch": "desktop-profile/patches/opencode-zen-free-provider-0.1.23-free-tier-gate.patch",
-  "opencodeZenPatchedEntrySha256": "6d3843d45bfd7886f3830a40a28e975bf763b7de7ce3abd3a98a57d295d21994",
+  "opencodeZenPatchedEntrySha256": "d6e798a4165c953098059a055297a73707c4915bb83df3727b67da99dd4a22e9",
   "disabledPurgePatches": [
     85,
     86
   ],
-  "verifiedDate": "2026-10-17",
-  "verifiedPlatform": "Windows x64; macOS build unchanged, revalidation pending",
-  "dshmarket": "1.66.32",
-  "opencodeZenRecoveryPatch": "desktop-profile/patches/opencode-zen-free-provider-0.1.24-upstream-recovery.patch"
+  "verifiedDate": "2026-10-18",
+  "verifiedPlatform": "Windows x64 build and runtime verified; macOS packaging requires a Mac",
+  "dshmarket": "1.66.37",
+  "opencodeZenRecoveryPatch": "desktop-profile/patches/opencode-zen-free-provider-0.1.25-rc2-compat.patch"
 }

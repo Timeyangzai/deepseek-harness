@@ -2,16 +2,16 @@
 
 English | [中文](README.zh.md)
 
-This directory contains three compatible plugin copies for Harness `0.2.1-alpha.2` and pinned dshmarket configuration shared by Windows and macOS. [Desktop](../apps/desktop/README.md) owns platform packaging, signing and runtimes; application installers are not included here.
+This directory contains three compatible plugin copies for Harness `0.2.1-rc.2` and pinned dshmarket configuration shared by Windows and macOS. [Desktop](../apps/desktop/README.md) owns platform packaging, signing and runtimes; application installers are not included here.
 
 ## Plugins
 
 | Plugin | Version | Local behavior |
 | --- | --- | --- |
-| dsh-purge | 1.1.71 | Adapts prompts, live rollback and source Desktop launch; excludes #85/#86 to retain official steering and queuing |
-| dsh-liangshen | 0.4.6 | Removes obsolete subagent background configuration; the plugin registers presets |
-| OpenCode Zen Free | 0.1.24 | Native model editing, catalog caching, connection compatibility and same-model protocol recovery |
-| dshmarket | 1.66.32 | Pinned npm version; manage community plugins in Settings → Plugin Market |
+| dsh-purge | 1.1.71 | Adapts prompts, live rollback and source Desktop launch; excludes #85/#86 to retain official steering and queuing; repairs retired redteam subagent fields while retaining maxDepth |
+| dsh-liangshen | 0.4.7 | Upstream rc.2 preset support; retains Purge prompt sections |
+| OpenCode Zen Free | 0.1.25 | Native model editing, catalog caching, connection compatibility and same-model protocol recovery |
+| dshmarket | 1.66.37 | Pinned npm version; manage community plugins in Settings → Plugin Market |
 
 See [versions.json](versions.json) for origins and checksums. Unmodified third-party READMEs retain upstream filenames and are outside the main repository's bilingual pairing.
 
@@ -42,7 +42,7 @@ The legacy `install-windows.ps1` still installs only Purge and LiangShen with of
 
 Expand a row in Settings → Models → OpenCode Zen Free → Edit to change context, output capacity and text/image inputs; capacities accept K/M suffixes. Saving changes only the plugin's `models`; restoring defaults removes the override and uses the scanned catalog. An explicit list replaces the selectable catalog; Get available models still discovers additions.
 
-DeepSeek Free defaults to 1,000,000 context and 256,000 output tokens, sharing capacity between input and output. The output value is a request parameter, not a guarantee that generation can fill it. Other models use their own catalog settings.
+DeepSeek Free defaults to 1,000,000 context and 256,000 output tokens, sharing capacity between input and output. The output value is a request parameter, not a guarantee that generation can fill it. GLM Flash Free uses the upstream 614,400-token context limit. Other models use their own catalog settings.
 
 Mounting reads Zen and models.dev catalogs with at most three attempts per feed, 20 seconds per attempt and a 45-second total budget. Successful metadata is saved in `$DSH_HOME/cache/opencode-zen-free-provider-catalog.json`; network failures can use the last successful cache. Without a cache, failure is warned and the catalog stays empty. Catalog presence does not establish current inference availability.
 
@@ -64,7 +64,7 @@ The local copy includes connection and protocol recovery fixes. Patches under `d
 
 ```sh
 node --test compat-plugins/tests/install.test.mjs
-node --test compat-plugins/dsh-purge/tests/harness-021.test.mjs compat-plugins/dsh-purge/tests/steering.test.mjs
+node --test compat-plugins/dsh-purge/tests/harness-021.test.mjs compat-plugins/dsh-purge/tests/steering.test.mjs compat-plugins/dsh-purge/tests/redteam-upgrade.test.mjs
 pnpm exec vitest run --config compat-plugins/vitest.config.ts
 ```
 

@@ -5,7 +5,7 @@
     "@jiesou/dsh-opencode-zen-free-provider": "file:../../local-plugins/dsh-opencode-zen-free-provider",
     "@linxin666/dsh-liangshen": "file:../../local-plugins/dsh-liangshen",
     "dsh-purge": "file:../../local-plugins/dsh-purge",
-    "dshmarket": "1.66.32"
+    "dshmarket": "1.66.37"
   },
   "dsh": {
     "profile": {

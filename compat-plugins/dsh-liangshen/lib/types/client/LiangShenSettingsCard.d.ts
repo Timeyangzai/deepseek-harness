@@ -14,9 +14,7 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-store';
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client';
 import { type CardActions, type CardShell, type FieldState as CardFieldState } from './settings-form.ts';
 /** Wire presentations the tool catalog accepts (mirrors the Host schema). */
-export declare const PRESENTATION_CHOICES: readonly ["ptc", "native", "both"];
-/** Sensitivity presets for the circuit breaker (mirrors the Host schema). */
-export declare const SENSITIVITY_CHOICES: readonly ["conservative", "balanced", "aggressive"];
+export declare const PRESENTATION_CHOICES: readonly ["ptc", "native"];
 /** The LiangShen fields this card edits (the namespace's full schema). */
 export interface LiangShenSettings {
     /** Master switch for the plugin. */
@@ -27,16 +25,6 @@ export interface LiangShenSettings {
     presentation?: string;
     /** Whether the preset appends the dispatcher rules section after the persona. */
     dispatcher?: boolean;
-    /** Master switch for the runtime degeneration circuit breaker. */
-    guardEnabled?: boolean;
-    /** Sensitivity preset scaling the breaker's adaptive thresholds. */
-    guardSensitivity?: string;
-    /** Per-step reasoning-character floor for the breaker's runaway ladder. */
-    guardStallReasoningChars?: number;
-    /** Consecutive output-free reasoning steps for the breaker's slow-burn ladder. */
-    guardGlobalStallCap?: number;
-    /** Identical-argument tool failures for the breaker's echo ladder. */
-    guardEchoFailures?: number;
 }
 /** What the LiangShen card renders. */
 export interface LiangShenSettingsCardState extends CardShell {
@@ -44,11 +32,6 @@ export interface LiangShenSettingsCardState extends CardShell {
     announceToAgent: CardFieldState;
     presentation: CardFieldState;
     dispatcher: CardFieldState;
-    guardEnabled: CardFieldState;
-    guardSensitivity: CardFieldState;
-    guardStallReasoningChars: CardFieldState;
-    guardGlobalStallCap: CardFieldState;
-    guardEchoFailures: CardFieldState;
 }
 /** The registration-side face the card's slot entry injects. */
 export interface LiangShenSettingsCardFace extends CardActions {

@@ -539,6 +539,7 @@ function buildModels(zenData, modelsById, userAgent, zenVariants) {
                 // Retain the locally verified DeepSeek budget and MiMo's 1M window.
                 contextWindow: id === 'deepseek-v4.1-flash-free' ? 1_000_000
                     : id === 'mimo-v2.6-flash-free' ? 1_048_576
+                    : id === 'glm-5.3-flash-free' ? 614_400
                     : typeof limit?.context === 'number' ? limit.context : 1_048_576,
                 maxTokens: id === 'deepseek-v4.1-flash-free' ? 256_000
                     : typeof limit?.output === 'number' ? limit.output : 32_768,

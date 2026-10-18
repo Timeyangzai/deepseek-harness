@@ -3,14 +3,14 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write compat-plugins/dsh-liangshen/README.md
 /dsh-liangshen-minimal-liangshen-persona-programmatic-tool-transport-for-deepseek-harness-dsh:
-  en: ea55c9b3ff63ba18
-  zh: 81f485deef8de894
+  en: 2f057af69e24a7d3
+  zh: 0d731e6bb0555e17
 /dsh-liangshen-minimal-liangshen-persona-programmatic-tool-transport-for-deepseek-harness-dsh/why:
-  en: de70e4a9f5f74eca
-  zh: c300139c9ad83d33
+  en: 310c2bb1be660ecc
+  zh: da80d8f9560cc59e
 /dsh-liangshen-minimal-liangshen-persona-programmatic-tool-transport-for-deepseek-harness-dsh/how-it-works:
-  en: 3087acfb6ee4ea54
-  zh: 583bf88f819d3a9a
+  en: 63cbc75dea1443dc
+  zh: 8d0c26ea5590dc23
 /dsh-liangshen-minimal-liangshen-persona-programmatic-tool-transport-for-deepseek-harness-dsh/security-model:
   en: 440002239b010d22
   zh: 7c5ef54bf29c5a9e
@@ -18,23 +18,23 @@
   en: 981f59f6202f6f27
   zh: c9f89d76612f9d80
 /dsh-liangshen-minimal-liangshen-persona-programmatic-tool-transport-for-deepseek-harness-dsh/preset-configuration:
-  en: f9a125944ab6700d
-  zh: dde1516e172f91be
+  en: 9302418af778efc8
+  zh: 8acec5b2fc49c741
 /dsh-liangshen-minimal-liangshen-persona-programmatic-tool-transport-for-deepseek-harness-dsh/install:
   en: 4365abe8c6c0a2b7
   zh: 69d15b7fffad1df7
 /dsh-liangshen-minimal-liangshen-persona-programmatic-tool-transport-for-deepseek-harness-dsh/verify:
-  en: 0a89b3b246fa1a21
-  zh: 2fae727b6e9a7b59
+  en: fb5abd6765603dc2
+  zh: df860c357819880e
 /dsh-liangshen-minimal-liangshen-persona-programmatic-tool-transport-for-deepseek-harness-dsh/verify/real-session-validation-conditions-and-benchmark-evaluation:
-  en: a8a1faf1cdc1fb56
-  zh: a0c42841eab2ad6b
+  en: 6928136e3939e084
+  zh: a62e6b5b81e0bcf4
 /dsh-liangshen-minimal-liangshen-persona-programmatic-tool-transport-for-deepseek-harness-dsh/configuration:
-  en: 36e773f013ad609c
-  zh: 399ce0ded4f4306e
+  en: b22014c9a15b9eb1
+  zh: 31b098e7c6571b55
 /dsh-liangshen-minimal-liangshen-persona-programmatic-tool-transport-for-deepseek-harness-dsh/behavior-and-limits:
-  en: 71a61c3c04fcdf34
-  zh: 0b79a6fd3103bbae
+  en: 8e92d743abe9cc17
+  zh: b898ddcfd80a79b2
 /dsh-liangshen-minimal-liangshen-persona-programmatic-tool-transport-for-deepseek-harness-dsh/license:
   en: 6e8f1b4de818a494
   zh: bfa0a52ee9c56ac4

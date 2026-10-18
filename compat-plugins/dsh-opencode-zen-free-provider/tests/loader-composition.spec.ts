@@ -118,10 +118,11 @@ it('retains an explicit empty catalog and rejects invalid capacities before comm
 })
 
 it('discovers new free models while preserving saved overrides and filtering unsupported catalog rows', async () => {
-  const { ctx } = await composition({ expectedCount: 4, extraModels: {
+  const { ctx } = await composition({ expectedCount: 5, extraModels: {
     'muse-spark-1.3-contributor-free': { name: 'Muse Spark 1.3 Free', limit: { context: 1048576, output: 131072 }, modalities: { input: ['text', 'image', 'audio'] } },
     'nemotron-3.5-super-vl-free': { name: 'Nemotron 3.5 Super VL Free', limit: { context: 1048576, output: 131072 }, modalities: { input: ['text', 'image'] } },
     'nemotron-3.5-lightning-free': { name: 'Nemotron 3.5 Lightning Free', limit: { context: 262144, output: 262144 }, modalities: { input: ['text'] } },
+    'glm-5.3-flash-free': { name: 'GLM Flash Free', limit: { context: 1048576, output: 32768 }, modalities: { input: ['text'] } },
     'retired-free': { name: 'Retired', status: 'deprecated', limit: { context: 1000, output: 100 }, modalities: { input: ['text'] } },
   } })
   const catalog = await ctx.llm.discoverModels('zen-custom-entry', { provider })
@@ -130,13 +131,14 @@ it('discovers new free models while preserving saved overrides and filtering uns
     { id: 'muse-spark-1.3-contributor-free', contextWindow: 1048576, maxTokens: 131072, inputModalities: ['text', 'image'] },
     { id: 'nemotron-3.5-super-vl-free', contextWindow: 1048576, maxTokens: 131072, inputModalities: ['text', 'image'] },
     { id: 'nemotron-3.5-lightning-free', contextWindow: 262144, maxTokens: 262144, inputModalities: ['text'] },
+    { id: 'glm-5.3-flash-free', contextWindow: 614400, maxTokens: 32768, inputModalities: ['text'] },
   ])
   await ctx.settings.mutate('zen-custom-entry', [{ op: 'set', path: ['models'], value: [{ id, contextWindow: 950000, maxTokens: 256000 }] }])
   expect(await ctx.llm.listModels(provider)).toHaveLength(1)
   expect(await ctx.llm.resolveModelInfo(provider, id)).toMatchObject({ context: { contextWindow: 950000 }, defaultMaxTokens: 256000 })
   expect(await ctx.llm.discoverModels('zen-custom-entry', { provider })).toEqual(catalog)
   await ctx.settings.mutate('zen-custom-entry', [{ op: 'unset', path: ['models'] }])
-  expect(await ctx.llm.listModels(provider)).toHaveLength(4)
+  expect(await ctx.llm.listModels(provider)).toHaveLength(5)
 })
 
 it('finishes persisting public catalog metadata before the Loader mount completes', async () => {

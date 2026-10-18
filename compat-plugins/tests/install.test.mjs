@@ -28,7 +28,7 @@ test('plan leaves user files and plugin directories untouched', t => {
   const original = readFileSync(join(profile, 'package.json'));
   const result = run(root, ['--plan']);
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(JSON.parse(result.stdout).dependencies.dshmarket, '1.66.32');
+  assert.equal(JSON.parse(result.stdout).dependencies.dshmarket, '1.66.37');
   assert.deepEqual(readFileSync(join(profile, 'package.json')), original);
   assert.equal(existsSync(join(root, 'local-plugins')), false);
 });
@@ -41,7 +41,7 @@ test('install passes offline mode, retains user data and existing bundles, and i
     assert.equal(result.status, 0, result.stdout + result.stderr);
   }
   const manifest = JSON.parse(readFileSync(join(profile, 'package.json')));
-  assert.equal(manifest.dependencies.dshmarket, '1.66.32');
+  assert.equal(manifest.dependencies.dshmarket, '1.66.37');
   assert.equal(manifest.dsh.profile.bundles.filter(x => x === 'dshmarket').length, 1);
   assert.ok(manifest.dsh.profile.bundles.includes('@deepseek-ai/dsh-base'));
   assert.deepEqual(JSON.parse(readFileSync(join(profile, 'pnpm-arguments.json'))), ['--dir', profile, 'install', '--optimistic-repeat-install=false', '--offline']);
