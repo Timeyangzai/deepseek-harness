@@ -28,7 +28,7 @@ test('plan leaves user files and plugin directories untouched', t => {
   const original = readFileSync(join(profile, 'package.json'));
   const result = run(root, ['--plan']);
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(JSON.parse(result.stdout).dependencies.dshmarket, '1.66.37');
+  assert.equal(JSON.parse(result.stdout).dependencies.dshmarket, '1.67.0');
   assert.deepEqual(readFileSync(join(profile, 'package.json')), original);
   assert.equal(existsSync(join(root, 'local-plugins')), false);
 });
@@ -41,7 +41,7 @@ test('install passes offline mode, retains user data and existing bundles, and i
     assert.equal(result.status, 0, result.stdout + result.stderr);
   }
   const manifest = JSON.parse(readFileSync(join(profile, 'package.json')));
-  assert.equal(manifest.dependencies.dshmarket, '1.66.37');
+  assert.equal(manifest.dependencies.dshmarket, '1.67.0');
   assert.equal(manifest.dsh.profile.bundles.filter(x => x === 'dshmarket').length, 1);
   assert.ok(manifest.dsh.profile.bundles.includes('@deepseek-ai/dsh-base'));
   assert.deepEqual(JSON.parse(readFileSync(join(profile, 'pnpm-arguments.json'))), ['--dir', profile, 'install', '--optimistic-repeat-install=false', '--offline']);
@@ -63,6 +63,20 @@ test('failed dependency installation restores the original manifest and lockfile
   assert.deepEqual(readFileSync(join(profile, 'package.json')), original);
   assert.equal(readFileSync(lock, 'utf8'), '# previous lock\n');
   assert.equal(existsSync(join(profile, 'package.json.lock')), false);
+});
+
+test('dependency updates retain an installed bundle that is not enabled', t => {
+  const { root, profile } = fixture(t);
+  const path = join(profile, 'package.json');
+  const previous = JSON.parse(readFileSync(path));
+  previous.dependencies['@goodandready/dsh-goal'] = '0.2.25';
+  writeFileSync(path, JSON.stringify(previous) + '\n');
+  const result = run(root);
+  assert.equal(result.signal, null, result.stderr);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const installed = JSON.parse(readFileSync(path));
+  assert.equal(installed.dependencies['@goodandready/dsh-goal'], '0.2.33');
+  assert.equal(installed.dsh.profile.bundles.includes('@goodandready/dsh-goal'), false);
 });
 
 test('a held profile lock prevents mutations', t => {

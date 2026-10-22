@@ -42,6 +42,13 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
  * the field is one the settings service shows a form for.
  */
 type LiveConfig = Schemastery.TypeT<typeof Config>;
+/**
+ * Pad absent assistant reasoning fields only for the named models; preserve other request bodies.
+ * @param body - JSON request body sent to the Zen endpoint.
+ * @param modelIds - this plugin instance's models needing transport padding.
+ * @returns the original body or its assistant-message padding.
+ */
+export declare const withReplayedReasoning: (body: string, modelIds: ReadonlySet<string>) => string;
 export declare const requiredZenTools: (tools?: readonly Tool[]) => Tool[];
 /** The refusal one stream event carries, when a different route may still answer. */
 export declare const recoverableUpstreamFailure: (event: unknown) => { type: string; code: string; message: string } | undefined;

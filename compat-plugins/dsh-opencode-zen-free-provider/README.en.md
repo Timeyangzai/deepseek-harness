@@ -6,7 +6,9 @@ OpenCode Zen Free provider for dsh.
 
 <img height="650" alt="image" src="https://github.com/user-attachments/assets/8cc57d90-76b8-4a7d-a9fe-1ebb39c4f51c" />
 
-This plugin adds OpenCode Zen's free models to dsh. At startup it syncs the OpenCode Zen and models.dev catalogs and exposes the models whose ids end in `-free`; the catalog is fetched once, no rescan. If the first scan fails the plugin still mounts with an empty catalog — one network blip never takes the model surface down.
+This plugin adds OpenCode Zen's free models to dsh. At startup it syncs the OpenCode Zen and models.dev catalogs and exposes the models whose ids end in `-free`. Mounting awaits the bounded initial scan. A failed scan uses the last successful public-metadata cache; without a usable cache, the plugin logs the failure and mounts with an empty catalog.
+
+The local compatible copy declares a 1,000,000-token context and 256,000-token output limit for DeepSeek V4.1 Flash, a 1,048,576-token context for MiMo V2.6 Flash, and a 614,400-token context for GLM 5.3 Flash. Other limits come from models.dev. These declarations do not guarantee upstream availability or capacity. Edit the provider's models in DSH settings to override its name, capacities or input modalities; `models: null` restores the scanned catalog, while an explicit array replaces it.
 
 ## Install
 
@@ -24,17 +26,19 @@ dsh plugin --profile web add github:jiesou/dsh-opencode-zen-free-provider
 
 ## After install
 
-The free endpoint works without an API key and uses the anonymous `Bearer public` credential by default. If `OPENCODE_ZEN_FREE_API_KEY` is stored through DSH's credentials service, it takes precedence.
+The free endpoint uses the anonymous `Bearer public` credential. The local compatible copy sends the OpenCode CLI User-Agent, timestamp-based session ids reused within one conversation, and the required `bash` and `read` tool schemas. It omits `HTTP-Referer` and `x-session-affinity`.
 
 No model configuration is needed. Pick the OpenCode Zen Free provider and a model on the Web Models page to start using it.
 
 ## Reasoning effort
 
-A model exposes exactly the levels the upstream feed credits it with. **Default** means "do not send `reasoning_effort`" — the upstream picks its own depth. **Off** is a real switch: it sends the upstream's literal close value (`none`, `off`, …). Models whose effort entry is empty or a `toggle` show no level selector at all.
+A model exposes exactly the levels the upstream feed declares. **Default** omits `reasoning_effort`. **Off** appears only when the chat-completions feed declares `none`; otherwise the plugin omits the unsupported parameter. Models with an empty effort entry or only a `toggle` expose no level selector. Replayed assistant messages preserve existing reasoning and include an empty `reasoning_content` when the upstream requires it and no reasoning was produced.
 
 ## Error reporting
 
 OpenCode Zen returns non-credential refusals (ended free promotions, region blocks, …) as HTTP 401/403, which dsh otherwise classifies as "invalid API key". The plugin preserves the real reason in the terminal error event; genuine auth failures still surface as AUTH. Anything unparseable passes through verbatim — the original error is never swallowed.
+
+With `upstreamRecovery: true` (the default), a structured server or protocol refusal may trigger one attempt on the same model's alternate protocol, before any content is emitted. The selected model and configured capacities remain unchanged. Authentication, free-tier admission, quota refusals, cancellation and failures after partial content do not trigger that recovery. A final refusal remains visible; select another model manually when the upstream cannot serve the selected model.
 
 ## Image budget
 

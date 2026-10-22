@@ -160,22 +160,52 @@ const zenApiHeaders = (model, options) => {
         'x-opencode-client': 'cli',
     };
 };
-// Zen's free tier only unlocks for the opencode CLI identity, but the harness
-// merges its own mandatory attribution `user-agent` over model headers
-// (dsh-llm's attributionHeaders, merged after model.headers by pi-ai's client),
-// so the fetch layer is the only place that still wins. Other hosts keep the
-// harness attribution untouched.
-const zenNativeFetch = globalThis.fetch;
-let zenUserAgent;
-const zenFetch = (input, init) => {
-    const url = typeof input === 'string'
-        ? input
-        : input instanceof URL ? input.href : input instanceof Request ? input.url : String(input);
-    if (zenUserAgent === undefined || new URL(url).hostname !== 'opencode.ai')
-        return zenNativeFetch(input, init);
-    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
-    headers.set('user-agent', zenUserAgent);
-    return zenNativeFetch(input, { ...init, headers });
+/**
+ * Pad assistant reasoning fields for models without an effort ladder.
+ * Existing reasoning, unrelated models and invalid JSON remain unchanged.
+ * @param body - JSON request body sent to the Zen endpoint.
+ * @param modelIds - this plugin instance's models needing transport padding.
+ * @returns the original body or its assistant-message padding.
+ */
+export const withReplayedReasoning = (body, modelIds) => {
+    let payload;
+    try {
+        payload = JSON.parse(body);
+    }
+    catch (error) {
+        // Non-JSON bodies are outside the chat-completions request format.
+        return body;
+    }
+    if (!isRecord(payload) || typeof payload.model !== 'string' || !modelIds.has(payload.model) || !Array.isArray(payload.messages))
+        return body;
+    let changed = false;
+    for (const message of payload.messages) {
+        if (!isRecord(message) || message.role !== 'assistant')
+            continue;
+        if (typeof message.reasoning_content !== 'string') {
+            message.reasoning_content = '';
+            changed = true;
+        }
+    }
+    return changed ? JSON.stringify(payload) : body;
+};
+// Zen needs the OpenCode CLI User-Agent after pi-ai merges Harness attribution.
+// The request adapter belongs to this plugin instance and leaves other hosts alone.
+const zenFetchFor = (userAgent, modelIds) => {
+    const nativeFetch = globalThis.fetch;
+    return (input, init) => {
+        const url = typeof input === 'string'
+            ? input
+            : input instanceof URL ? input.href : input instanceof Request ? input.url : String(input);
+        if (new URL(url).hostname !== 'opencode.ai')
+            return nativeFetch(input, init);
+        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        headers.set('user-agent', userAgent);
+        const nextInit = { ...init, headers };
+        if (typeof nextInit.body === 'string')
+            nextInit.body = withReplayedReasoning(nextInit.body, modelIds);
+        return nativeFetch(input, nextInit);
+    };
 };
 /**
  * Model-visible description of a placeholder this harness cannot execute.
@@ -228,23 +258,22 @@ export const requiredZenTools = (tools = []) => {
 // the transcript's system messages, so padding the list means rewriting the
 // leading `toolsAdded` (falling back to `context.tools`, which a context built
 // before normalization still carries).
-const normalizeReasoningContext = (context) => ({
-    ...context,
-    messages: context.messages.map((message, index) => {
-        // Pad the tool list where pi-ai keeps it: the leading system message.
-        if (index === 0 && message.role === 'system') {
-            return { ...message, toolsAdded: requiredZenTools(message.toolsAdded ?? context.tools ?? []) };
-        }
-        if (message.role !== 'assistant')
-            return message;
-        return {
+const normalizeReasoningContext = (context) => {
+    const baseMessages = context.messages[0]?.role === 'system'
+        ? context.messages.map((message, index) => index === 0
+            ? { ...message, toolsAdded: requiredZenTools(message.toolsAdded ?? context.tools ?? []) }
+            : message)
+        : [{ role: 'system', content: '', toolsAdded: requiredZenTools(context.tools ?? []), timestamp: Date.now() }, ...context.messages];
+    return {
+        ...context,
+        messages: baseMessages.map(message => message.role !== 'assistant' ? message : {
             ...message,
             content: message.content.map(block => block.type === 'thinking' && block.thinking.trim().length > 0 && block.thinkingSignature === undefined
                 ? { ...block, thinkingSignature: 'reasoning_content' }
                 : block),
-        };
-    }),
-});
+        }),
+    };
+};
 // Zen reports non-credential refusals (ended free promotions, region blocks) as
 // HTTP 401/403, which the harness classifies as AUTH and masks as "API key is
 // invalid". Rewriting the envelope to an [opencode-zen <type>] message gets the
@@ -386,10 +415,10 @@ const sanitizeStream = (stream) => {
     };
     return stream;
 };
-const zenInvoke = (api, kind, model, context, options) => {
+const zenInvoke = (api, kind, model, context, options, fetch) => {
     const prepared = { ...model, headers: zenApiHeaders(model, options) };
     const normalized = normalizeReasoningContext(context);
-    const run = { ...options, fetch: zenFetch };
+    const run = { ...options, fetch };
     if (api === 'openai-responses') {
         return sanitizeStream(kind === 'simple'
             ? piResponsesStreamSimple(prepared, normalized, run)
@@ -416,8 +445,8 @@ const zenAttempts = (model, recovery) => {
     return plan;
 };
 const zenStreamFor = (recovery, onSwitch) => ({
-    stream: (model, context, options) => withUpstreamRecovery(zenAttempts(model, recovery), (spec) => zenInvoke(spec.api, 'stream', spec.model, context, options), onSwitch, options?.signal),
-    streamSimple: (model, context, options) => withUpstreamRecovery(zenAttempts(model, recovery), (spec) => zenInvoke(spec.api, 'simple', spec.model, context, options), onSwitch, options?.signal),
+    stream: (model, context, options) => withUpstreamRecovery(zenAttempts(model, recovery), (spec) => zenInvoke(spec.api, 'stream', spec.model, context, options, recovery.fetch), onSwitch, options?.signal),
+    streamSimple: (model, context, options) => withUpstreamRecovery(zenAttempts(model, recovery), (spec) => zenInvoke(spec.api, 'simple', spec.model, context, options, recovery.fetch), onSwitch, options?.signal),
 });
 const CATALOG_ATTEMPTS = 3;
 const CATALOG_TIMEOUT_MS = 20_000;
@@ -458,34 +487,23 @@ function reasoningLevelsFor(metadata) {
 // `Default` (the harness's "no selection" path) is the *absent key* — leaving
 // `reasoning_effort` off the wire and letting the upstream choose. Each ladder
 // level the endpoint accepts lands at its own key with its own wire value; the
-// `off` key carries the upstream's literal close value when the feed names one
-// (e.g. `none`), so the selector's "Off" entry is a real switch rather than a
-// `no-op. Responses-model feeds name no close value and `/responses` rejects
-// both fabricated ones (`'off'` is an unknown variant, `'none'` unsupported
-// for this model). pi-ai sends nothing only when the key is explicitly `null`
-// (an absent key falls back to sending `'none'`), so `off: null` is the honest
-// "upstream decides" — it also drops "Off" from the selector, which is correct
-// because this endpoint offers no way to turn thinking down.
+// `off` key carries `none` only when the chat-completions feed declares it.
+// Otherwise null omits the wire parameter and removes the unsupported Off choice.
 function reasoningMapFor(levels, api) {
     const map = {};
     for (const key of PI_LEVEL_KEYS) {
-        if (levels.includes(key))
-            map[key] = key;
+        map[key] = levels.includes(key) ? key : null;
     }
-    if (api === 'openai-completions') {
-        map.off = levels.includes('none') ? 'none' : 'off';
-    }
-    else {
-        map.off = null;
-    }
+    map.off = api === 'openai-completions' && levels.includes('none') ? 'none' : null;
     return map;
 }
 // Turn the live-scanned feeds into pi-ai model descriptors. Both transport
 // surfaces are built for every model id: the declared one is registered, and the
 // other stays available as a recovery attempt when the declared one refuses.
-function buildModels(zenData, modelsById, userAgent, zenVariants) {
+function buildModels(zenData, modelsById, userAgent, zenVariants, reasoningBackfill) {
     const baseModels = getBuiltinModels('opencode');
     zenVariants.clear();
+    reasoningBackfill.clear();
     return zenData
         .filter((entry) => isRecord(entry) && typeof entry.id === 'string' && entry.id.endsWith('-free'))
         .flatMap((entry) => {
@@ -505,6 +523,8 @@ function buildModels(zenData, modelsById, userAgent, zenVariants) {
         // control", never "no thinking".
         const levels = reasoningLevelsFor(metadata);
         const controllable = levels.length > 0;
+        if (!controllable)
+            reasoningBackfill.add(id);
         const limit = isRecord(metadata.limit) ? metadata.limit : undefined;
         const input = isRecord(metadata.modalities) && Array.isArray(metadata.modalities.input)
             ? metadata.modalities.input.filter((value) => value === 'text' || value === 'image')
@@ -523,8 +543,8 @@ function buildModels(zenData, modelsById, userAgent, zenVariants) {
             // there, and that API stays non-strict by default.
             const strictCompat = api === 'openai-responses' ? { supportsStrictMode: true } : {};
             const compat = baseCompat === undefined
-                ? { maxTokensField: 'max_tokens', supportsReasoningEffort: false, ...strictCompat }
-                : { ...baseCompat, requiresReasoningContentOnAssistantMessages: false, ...strictCompat };
+                ? { maxTokensField: 'max_tokens', supportsReasoningEffort: false, ...strictCompat, requiresReasoningContentOnAssistantMessages: true }
+                : { ...baseCompat, requiresReasoningContentOnAssistantMessages: true, ...strictCompat };
             return {
                 id,
                 name: typeof metadata.name === 'string' ? metadata.name : id,
@@ -611,8 +631,9 @@ export async function apply(ctx, config) {
     // One-time: the Zen user-agent the transport forces on every opencode.ai/zen request.
     const opencodeVersion = await resolveOpenCodeVersion();
     const opencodeUserAgent = `opencode/${opencodeVersion}`;
-    zenUserAgent = opencodeUserAgent;
     const zenVariants = new Map();
+    const reasoningBackfill = new Set();
+    const zenFetch = zenFetchFor(opencodeUserAgent, reasoningBackfill);
     // The Loader owns the settings namespace, so the configuration form is
     // addressed by the profile entry id that mounted this plugin.
     const settingsNs = ctx.fiber.entry?.options.id ?? name;
@@ -622,7 +643,7 @@ export async function apply(ctx, config) {
     const buildProfiles = () => {
         const opts = liveConfig(config);
         const catalog = configuredModels(scanned, opts.models);
-        const recovery = { enabled: opts.upstreamRecovery, variants: zenVariants };
+        const recovery = { enabled: opts.upstreamRecovery, variants: zenVariants, fetch: zenFetch };
         const onSwitch = (from, to, failure) => ctx.logger.warn('[%s] %s refused (%s: %s); retrying on %s', name, from.label, failure.type, failure.message, to.label);
         const streamApi = zenStreamFor(recovery, onSwitch);
         const piProvider = createProvider({
@@ -693,7 +714,7 @@ export async function apply(ctx, config) {
     // can use last-good public metadata without changing user model overrides.
     async function sync() {
         const usable = (zen, models, userAgent) => {
-            const next = buildModels(zen, models, userAgent, zenVariants);
+            const next = buildModels(zen, models, userAgent, zenVariants, reasoningBackfill);
             if (next.length === 0) throw new Error('no OpenCode Zen free models resolved');
             return next;
         };

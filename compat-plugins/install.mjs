@@ -56,7 +56,7 @@ if (options.plan) {
       cpSync(source, target, { recursive: true });
     }
     manifest.dependencies = { ...manifest.dependencies, ...template.dependencies };
-    for (const name of Object.keys(template.dependencies)) {
+    for (const name of template.dsh.profile.bundles) {
       if (!manifest.dsh.profile.bundles.includes(name)) manifest.dsh.profile.bundles.push(name);
     }
     await writeFileAtomic(manifestPath, JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });

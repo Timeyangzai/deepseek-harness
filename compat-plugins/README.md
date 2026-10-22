@@ -2,16 +2,20 @@
 
 English | [中文](README.zh.md)
 
-This directory contains three compatible plugin copies for Harness `0.2.1-rc.2` and pinned dshmarket configuration shared by Windows and macOS. [Desktop](../apps/desktop/README.md) owns platform packaging, signing and runtimes; application installers are not included here.
+This directory contains three compatible plugin copies for Harness `0.2.1-rc.2` and five pinned npm plugins shared by Windows and macOS. [Desktop](../apps/desktop/README.md) owns platform packaging, signing and runtimes; application installers are not included here.
 
 ## Plugins
 
 | Plugin | Version | Local behavior |
 | --- | --- | --- |
 | dsh-purge | 1.1.71 | Adapts prompts, live rollback and source Desktop launch; excludes #85/#86 to retain official steering and queuing; repairs retired redteam subagent fields while retaining maxDepth |
-| dsh-liangshen | 0.4.7 | Upstream rc.2 preset support; retains Purge prompt sections |
-| OpenCode Zen Free | 0.1.25 | Native model editing, catalog caching, connection compatibility and same-model protocol recovery |
-| dshmarket | 1.66.37 | Pinned npm version; manage community plugins in Settings → Plugin Market |
+| dsh-liangshen | 0.4.8 | Upstream rc.2 preset support; retains Purge prompt sections |
+| OpenCode Zen Free | 0.1.28 | Native model editing, catalog caching, connection compatibility and same-model protocol recovery |
+| dshmarket | 1.67.0 | Manage community plugins in Settings → Plugin Market |
+| billion-context | 0.1.204 | Preserve existing context settings |
+| dsh-free-search | 0.9.13 | Preserve existing search settings |
+| dsh-rewind-plugin | 0.18.0 | Preserve existing rewind settings |
+| dsh-goal | 0.2.33 | Installed dependency; not enabled by the shared profile |
 
 See [versions.json](versions.json) for origins and checksums. Unmodified third-party READMEs retain upstream filenames and are outside the main repository's bilingual pairing.
 
@@ -28,13 +32,25 @@ node compat-plugins/install.mjs --dsh-home "/absolute/path/to/dsh-home"
 
 Windows accepts `"C:/path/to/dsh-home"`; use the actual path on macOS. No user directory is hardcoded. Add `--offline` when every dependency is cached; `--pnpm-entry` selects another `pnpm.mjs`.
 
-The installer backs up the manifest, existing lockfile and local plugins to `$DSH_HOME/plugin-backups/compat-*`, copies three compatible plugins, then merges four dependencies and bundle selections and runs pnpm. Existing model settings, credentials, sessions and other plugins remain unchanged; repeated runs do not duplicate selections.
+The installer backs up the manifest, existing lockfile and local plugins to `$DSH_HOME/plugin-backups/compat-*`, copies three compatible plugins, then merges eight dependencies and the template’s selected bundles and runs pnpm. Existing model settings, credentials, sessions and other plugins remain unchanged; repeated runs do not duplicate selections.
 
 If pnpm fails, the original manifest and previous lockfile are restored and the backup location is reported; local plugin copies and node_modules may have changed. Keep Desktop closed and repair from the backup or resolve the network issue before retrying; do not assume every file was rolled back.
 
 Restart Desktop and check Plugin Market and installed plugin status; check and apply dsh-purge patches as needed. LiangShen presets should be selectable; move an old `.agent-presets/liangshen` directory to a backup if it overrides plugin presets.
 
-The legacy `install-windows.ps1` still installs only Purge and LiangShen with offline pnpm; use the shared entry for all four. Desktop supports Windows x64 and macOS arm64/x64. This installer was exercised on Windows; macOS installation, signing and packaging still require verification on a Mac.
+The legacy `install-windows.ps1` still installs only Purge and LiangShen with offline pnpm; use the shared entry for the complete set. Desktop supports Windows x64 and macOS arm64/x64. This installer was exercised on Windows; macOS installation, signing and packaging still require verification on a Mac.
+
+## Purge backup and recovery
+
+The [Purge 1.1.71 archive](archives/dsh-purge-1.1.71-compatible-20261023.tgz) contains 104 runtime files from the [compatible source copy](dsh-purge/), including original attribution and license notices. The [backup manifest](archives/manifest.json) records archive and file SHA-256 checksums. Upstream repository and registry requests returned HTTP 404 on 2026-10-23, so the latest upstream version is unknown; this archive preserves the working local version.
+
+For Desktop, use the installation steps above to restore from the compatible source copy. To install the archive into a separate custom profile, run this command from the repository root; replace `recovery-check` with the intended profile name:
+
+```sh
+pnpm dsh plugin --profile recovery-check add ./compat-plugins/archives/dsh-purge-1.1.71-compatible-20261023.tgz --offline --ignore-scripts
+```
+
+This command installs and selects the bundle without starting its Host plugin. A fresh isolated profile installation was verified offline; pnpm reported a peer-dependency warning. The backup contains plugin code, not personal settings, credentials, sessions or dependency trees.
 
 ## Model configuration
 

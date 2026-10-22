@@ -3,14 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write compat-plugins/README.md
 /desktop-compatibility-plugins:
-  en: d61c3310f5cd6681
-  zh: 63db755a299a5bac
+  en: df4a36619c7121b1
+  zh: f93671765078451e
 /desktop-compatibility-plugins/plugins:
-  en: f3c1a7f6fb8a8ac4
-  zh: 9963f21106d81728
+  en: 000aa78780a5d891
+  zh: 79c9eb38a363fdb9
 /desktop-compatibility-plugins/windows-macos-installation:
-  en: 1457b4f2c939039a
-  zh: 45d9f42c669f9d4a
+  en: 6b6cd55e41cd9b88
+  zh: 7d7ee2d30807374b
+/desktop-compatibility-plugins/purge-backup-and-recovery:
+  en: 49954c0dda040342
+  zh: d2c7878338517a47
 /desktop-compatibility-plugins/model-configuration:
   en: 640abf060f34ede6
   zh: 979c87de232e3154

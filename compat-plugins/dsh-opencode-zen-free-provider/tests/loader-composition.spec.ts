@@ -7,7 +7,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader, { type ModuleLoaderV2 } from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import LlmRuntime from '@deepseek-ai/dsh-llm'
+import LlmRuntime, { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import { profileComposition } from '../../../packages/settings/settings/tests/profile-composition.ts'
 import * as Zen from '../lib/index.js'
 
@@ -30,6 +30,7 @@ type CatalogModel = {
   limit: { context: number; output: number }
   modalities: { input: string[] }
   status?: string
+  reasoning_options?: { type: string; values: string[] }[]
 }
 type Options = {
   extraModels?: Record<string, CatalogModel>
@@ -37,6 +38,7 @@ type Options = {
   cached?: string
   expectedCount?: number
   failFirst?: boolean
+  inference?: (input: string | URL | Request, init?: RequestInit) => Response | Promise<Response>
 }
 
 async function composition(options: Options = {}) {
@@ -52,14 +54,16 @@ async function composition(options: Options = {}) {
     ...options.extraModels,
   }
   let attempts = 0
-  const fetch = vi.fn(async (input: string) => {
-    if (input === 'https://unpkg.com/opencode-ai@latest/package.json') return Response.json({ version: '1.19.0' })
-    if (input === 'https://opencode.ai/inference/v1/models') {
+  const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const url = input instanceof Request ? input.url : String(input)
+    if (url === 'https://unpkg.com/opencode-ai@latest/package.json') return Response.json({ version: '1.19.0' })
+    if (url === 'https://opencode.ai/inference/v1/models') {
       attempts++
       if (options.unavailable || (options.failFirst && attempts === 1)) return Response.json({}, { status: 503 })
       return Response.json({ data: [...Object.keys(models), 'jev-1.13-free', 'paid-model'].map(id => ({ id })) })
     }
-    if (input === 'https://models.dev/api.json') return Response.json({ opencode: { models } })
+    if (url === 'https://models.dev/api.json') return Response.json({ opencode: { models } })
+    if (url === 'https://opencode.ai/inference/v1/chat/completions' && options.inference !== undefined) return options.inference(input, init)
     throw new Error(`Unexpected test request: ${input}`)
   })
   vi.stubGlobal('fetch', fetch)
@@ -180,4 +184,63 @@ it('pads absent and empty required tool schemas without changing existing declar
     { name: 'bash', parameters: { properties: { command: { type: 'string' } }, required: ['command'] } },
     { name: 'read', parameters: { properties: { file_path: { type: 'string' } }, required: ['file_path'] } },
   ])
+})
+
+it('sends padded replay reasoning and required tools even without an initial system message', async () => {
+  let request: Record<string, unknown> | undefined
+  let headers: Headers | undefined
+  const { ctx } = await composition({ inference: async (input, init) => {
+    request = JSON.parse(typeof init?.body === 'string' ? init.body : input instanceof Request ? await input.text() : '{}')
+    headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
+    const frames = [
+      { choices: [{ delta: { role: 'assistant', content: 'hello' }, index: 0, finish_reason: null }] },
+      { choices: [{ delta: {}, index: 0, finish_reason: 'stop' }], usage: { prompt_tokens: 3, completion_tokens: 1 } },
+    ]
+    return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join('') + 'data: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } })
+  } })
+  const source = { kind: 'model' as const, provider, model: id }
+  const messages = [
+    createUserMessage({ content: [{ type: 'text', text: 'earlier question' }], source }),
+    createAssistantMessage({ content: [{ type: 'text', text: 'earlier answer' }], source: { provider, model: id } }),
+    createUserMessage({ content: [{ type: 'text', text: 'continue' }], source }),
+  ]
+  const chunks = []
+  for await (const chunk of ctx.llm.stream({ provider, model: id, messages })) chunks.push(chunk)
+  expect(chunks.at(-1)).toMatchObject({ type: 'finish', reason: { kind: 'stop' } })
+  expect(request).toMatchObject({
+    model: id, stream: true,
+    messages: expect.arrayContaining([{ role: 'assistant', content: 'earlier answer', reasoning_content: '' }]),
+    tools: expect.arrayContaining([
+      expect.objectContaining({ function: expect.objectContaining({ name: 'bash', parameters: expect.objectContaining({ properties: expect.objectContaining({ command: expect.any(Object) }) }) }) }),
+      expect.objectContaining({ function: expect.objectContaining({ name: 'read', parameters: expect.objectContaining({ properties: expect.objectContaining({ file_path: expect.any(Object) }) }) }) }),
+    ]),
+  })
+  expect(headers?.get('user-agent')).toBe('opencode/1.19.0')
+  expect(headers?.get('authorization')).toBe('Bearer public')
+  expect(headers?.get('x-opencode-session')).toMatch(/^ses_[0-9a-f]{12}[0-9A-Za-z]{14}$/)
+  expect(headers?.has('x-session-affinity')).toBe(false)
+  expect(headers?.has('http-referer')).toBe(false)
+})
+
+it('exposes Off only when the feed explicitly accepts none', async () => {
+  const { ctx } = await composition({ expectedCount: 3, extraModels: {
+    'no-close-free': { name: 'No close', limit: { context: 1000, output: 100 }, modalities: { input: ['text'] }, reasoning_options: [{ type: 'effort', values: ['low', 'high'] }] },
+    'with-close-free': { name: 'With close', limit: { context: 1000, output: 100 }, modalities: { input: ['text'] }, reasoning_options: [{ type: 'effort', values: ['none', 'high'] }] },
+  } })
+  expect((await ctx.llm.resolveModelInfo(provider, 'no-close-free')).reasoning?.efforts.map(effort => effort.id)).toEqual(['low', 'high'])
+  expect((await ctx.llm.resolveModelInfo(provider, 'with-close-free')).reasoning?.efforts.map(effort => effort.id)).toEqual(['off', 'high'])
+})
+
+it('preserves real reasoning and leaves unrelated or invalid bodies untouched', () => {
+  const modelIds = new Set([id])
+  const body = JSON.stringify({ model: id, messages: [
+    { role: 'assistant', content: 'answer', reasoning_content: 'retained reasoning' },
+    { role: 'assistant', content: 'empty reasoning', reasoning_content: '' },
+    { role: 'user', content: 'question' },
+  ] })
+  expect(Zen.withReplayedReasoning(body, modelIds)).toBe(body)
+  expect(Zen.withReplayedReasoning('{invalid', modelIds)).toBe('{invalid')
+  const unrelated = JSON.stringify({ model: 'other-free', messages: [{ role: 'assistant', content: 'other answer' }] })
+  expect(Zen.withReplayedReasoning(unrelated, modelIds)).toBe(unrelated)
+  expect(Zen.withReplayedReasoning(JSON.stringify({ model: id, messages: [{ role: 'assistant', content: 'answer' }] }), new Set())).toBe(JSON.stringify({ model: id, messages: [{ role: 'assistant', content: 'answer' }] }))
 })

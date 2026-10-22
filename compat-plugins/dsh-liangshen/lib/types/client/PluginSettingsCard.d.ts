@@ -38,6 +38,19 @@ export interface PluginSettingsCardProps<TKey extends string = string> {
     /** Drop every staged edit. */
     onDiscard: () => void;
     /**
+     * Id applied to the card's title element, so a header control (an immediate
+     * toggle in `headerAction`) can name itself through `aria-labelledby`
+     * instead of repeating the title as a string.
+     */
+    titleId?: string;
+    /**
+     * Render the header only, with no body region. A card whose whole setting is
+     * the header control (a switch whose explanation is the description) has no
+     * controls to lay out below it, and an empty body would draw a divider line
+     * with nothing under it.
+     */
+    headerOnly?: boolean;
+    /**
      * Render the controls expanded on arrival (still collapsible). Defaults to
      * true: promoted first-level sections show their settings immediately.
      */
@@ -54,6 +67,13 @@ export interface PluginSettingsCardProps<TKey extends string = string> {
      * edits, so the footer would sit there permanently disabled.
      */
     hideFooter?: boolean;
+    /**
+     * Optional control rendered at the header's trailing edge, before the pending
+     * badge and the chevron. A card whose setting is one immediate flip (it
+     * applies outside the staged form) puts its ToggleSwitch here, so the control
+     * is reachable without opening the card and matches a plugin card's shape.
+     */
+    headerAction?: ReactNode;
     /** Render children even when the settings namespace is not exposed by the host. */
     renderChildrenWhenNotExposed?: boolean;
     /** Hide the 'not exposed' warning banner when the settings namespace is not exposed. */
@@ -140,5 +160,24 @@ export declare function ChoiceField(props: FieldProps & {
         value: string;
         label: string;
     }>;
+}): import("react").JSX.Element;
+/**
+ * An immediate boolean toggle drawn as a switch track, for a setting that
+ * applies on flip rather than through a staged save. It is a real button with
+ * `role="switch"` and `aria-checked`, so keyboard and assistive activation
+ * arrive as a click and the state is announced instead of inferred from a
+ * checkbox tick.
+ */
+export declare function ToggleSwitch(props: {
+    /** Id of the element naming the switch (the card's title). */
+    labelledBy?: string;
+    /** Accessible name when no element labels it. */
+    ariaLabel?: string;
+    /** Current state. */
+    checked: boolean;
+    /** Disables the switch while a write is in flight or the Host refuses writes. */
+    disabled?: boolean;
+    /** Called with the requested next state. */
+    onChange: (next: boolean) => void;
 }): import("react").JSX.Element;
 export {};

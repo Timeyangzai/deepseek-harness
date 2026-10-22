@@ -6,9 +6,9 @@ OpenCode Zen Free provider for dsh.
 
 <img height="650" alt="image" src="https://github.com/user-attachments/assets/8cc57d90-76b8-4a7d-a9fe-1ebb39c4f51c" />
 
-本插件可以将 OpenCode Zen 的免费模型接入 dsh 使用。插件启动时从 OpenCode Zen 和 models.dev 同步模型目录与所有元数据，**仅抓取一次**，不轮循。哪怕启动时拉取失败，插件也能正常挂载，路由以空目录提供服务。
+本插件可以将 OpenCode Zen 的免费模型接入 dsh 使用。插件启动时从 OpenCode Zen 和 models.dev 同步模型目录，筛选 id 以 `-free` 结尾的模型。挂载会等待有时间上限的首次扫描；扫描失败时使用最近一次成功保存的公开元数据缓存，没有可用缓存时则记录错误并以空目录挂载。
 
-上下文窗口默认以 models.dev 的元数据为准。**MiMo V2.6 Flash、DeepSeek V4.1 Flash 与 GLM 5.3 Flash 例外**：它们的后端实际服务比免费档登记的 200K 更宽，本插件按实测值声明（前两者 1M，GLM 5.3 Flash 600K）。实测 `deepseek-v4.1-flash-free` 在 104 万 prompt tokens 时仍返回 200，把针藏在 3MB 文档 93% 深处也能准确取回；真正的天花板是请求体大小（约 3.9MB 字符）而不是上下文窗口。`glm-5.3-flash-free`（上游路由到 `perplexity/glm-5.3-flash`）在 26.4 万 prompt tokens 时同样取回藏在 93% 深处的标记，61.7 万 tokens 仍返回 200，65.9 万 tokens 起被上游 `context_length_exceeded` 拒绝，所以按 60 万声明而不是付费档的 1M。
+本地兼容副本为 DeepSeek V4.1 Flash 声明 1,000,000 tokens 上下文和 256,000 tokens 输出上限，为 MiMo V2.6 Flash 声明 1,048,576 tokens 上下文，为 GLM 5.3 Flash 声明 614,400 tokens 上下文；其他容量来自 models.dev。这些声明不保证上游当前可用性或实际容量。可以在 DSH 设置中编辑该提供方的模型名称、容量和输入模态；`models: null` 恢复扫描目录，显式数组则替换目录。
 
 ## 安装
 
@@ -28,22 +28,17 @@ dsh plugin --profile web add github:jiesou/dsh-opencode-zen-free-provider
 
 模型列表**无需任何配置**，插件启动时会自动从远程同步并过滤所有免费模型。在 Web Models 页面选择 OpenCode Zen Free 和模型后即可开始使用。
 
+免费接口使用匿名凭证 `Bearer public`。本地兼容副本发送 OpenCode CLI User-Agent、在同一对话内复用的时间戳 session id，以及必需的 `bash` 和 `read` 工具声明；省略 `HTTP-Referer` 和 `x-session-affinity`。
+
 ## 推理深度（Reasoning effort）
 
-模型只暴露上游接受的档位，不造档位。**Default** 表示"不发送 `reasoning_effort`"字段，由上游自行决定深度。**Off** 是真开关——发送上游的关闭字面值（`none`、`off` 等）。effort 配置为空或只有 toggle 的模型干脆不显示档位选择器。
+模型只暴露上游声明的档位。**Default** 省略 `reasoning_effort`。只有 chat-completions 目录明确声明 `none` 时才显示 **Off**；其他情况省略不支持的参数。effort 配置为空或只有 toggle 的模型不显示档位选择器。历史 assistant 消息保留已有推理；上游要求推理字段而该轮没有推理时，发送空的 `reasoning_content`。
 
 ## 错误提示
 
 OpenCode Zen 把非凭证类拒绝（免费额度到期、区域限制等）以 HTTP 401/403 返回，dssharness 会把这些状态码归类为"API Key 无效"。本插件在终端错误事件里保留真实原因，让真因显示出来；真正的鉴权失败仍按 AUTH 走。无法解析的内容原样透传。
 
-若看到 `FreeTierError: OpenCode's free tier can only be used from within OpenCode`，那是**上游的客户端指纹门**，与本插件无关，也不是 API Key 问题。2026-10-11 起免费层从 `/zen/v1` 迁到 `/inference/v1`，门禁下沉到不可审计的私有 inference 服务。本插件按实测通过条件构造请求：
-
-- 走 `/inference/v1`（`/zen/v1` 对匿名请求一律 403）；
-- 四个 session 头同值双发：`x-opencode-session`、`x-opencode-session-id`、`x-session-affinity`、`x-session-id`；
-- `x-opencode-project: global`（40-hex project id 会触发 403）；
-- **不发** `x-opencode-request`，**不发** `HTTP-Referer`——这两个头的存在本身就会触发 403；
-- session id 前 12 位 hex 必须是反转时间戳（`ses_` 降序、`msg_` 升序），纯随机即拒；
-- 请求的 tools 必须包含 `bash` 与 `read`（按小写名精确匹配），缺任一即 403。精简、标题、摘要等工具数不足的请求由本插件自动补齐占位工具。
+`upstreamRecovery: true`（默认）允许在尚未输出内容时，针对结构化的服务器或协议拒绝，以同一模型的另一种协议再尝试一次；所选模型和配置容量保持不变。鉴权、免费层准入、额度拒绝、取消和已经输出部分内容的失败均不会触发该恢复。最终拒绝仍会显示；上游无法提供所选模型时，请手动选择其他模型。
 
 提示：OpenCode 的 Free 模型会被基于 IP 限流。
 
