@@ -29,6 +29,8 @@ test('plan leaves user files and plugin directories untouched', t => {
   const result = run(root, ['--plan']);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(JSON.parse(result.stdout).dependencies.dshmarket, '1.67.0');
+  assert.equal(JSON.parse(result.stdout).dependencies['dsh-input-traffic'], '0.7.6');
+  assert.equal(JSON.parse(result.stdout).dependencies['billion-context'], '0.1.208');
   assert.deepEqual(readFileSync(join(profile, 'package.json')), original);
   assert.equal(existsSync(join(root, 'local-plugins')), false);
 });
@@ -43,6 +45,9 @@ test('install passes offline mode, retains user data and existing bundles, and i
   const manifest = JSON.parse(readFileSync(join(profile, 'package.json')));
   assert.equal(manifest.dependencies.dshmarket, '1.67.0');
   assert.equal(manifest.dsh.profile.bundles.filter(x => x === 'dshmarket').length, 1);
+  assert.equal(manifest.dependencies['dsh-input-traffic'], '0.7.6');
+  assert.equal(manifest.dsh.profile.bundles.filter(x => x === 'dsh-input-traffic').length, 1);
+  assert.equal(manifest.dependencies['billion-context'], '0.1.208');
   assert.ok(manifest.dsh.profile.bundles.includes('@deepseek-ai/dsh-base'));
   assert.deepEqual(JSON.parse(readFileSync(join(profile, 'pnpm-arguments.json'))), ['--dir', profile, 'install', '--optimistic-repeat-install=false', '--offline']);
   assert.equal(readFileSync(join(profile, 'cordis.patch.yml'), 'utf8'), '# preserve settings\n');

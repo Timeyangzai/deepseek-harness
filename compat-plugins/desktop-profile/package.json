@@ -7,9 +7,10 @@
     "dsh-purge": "file:../../local-plugins/dsh-purge",
     "dshmarket": "1.67.0",
     "@goodandready/dsh-goal": "0.2.33",
-    "billion-context": "0.1.204",
+    "billion-context": "0.1.208",
     "dsh-free-search": "0.9.13",
-    "dsh-rewind-plugin": "0.18.0"
+    "dsh-rewind-plugin": "0.18.0",
+    "dsh-input-traffic": "0.7.6"
   },
   "dsh": {
     "profile": {
@@ -23,7 +24,8 @@
         "dshmarket",
         "billion-context",
         "dsh-free-search",
-        "dsh-rewind-plugin"
+        "dsh-rewind-plugin",
+        "dsh-input-traffic"
       ]
     }
   }
