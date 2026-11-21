@@ -30,6 +30,12 @@ export declare const zh: {
     'settings.presentationHint': string;
     'settings.dispatcher': string;
     'settings.dispatcherHint': string;
+    'settings.pagedToolPatterns': string;
+    'settings.pagedToolPatternsHint': string;
+    'settings.pagedToolPatternsInvalid': string;
+    'settings.idleReclaimSteps': string;
+    'settings.idleReclaimStepsHint': string;
+    'settings.idleReclaimStepsInvalid': string;
     'settings.on': string;
     'settings.off': string;
     'settings.inherit': string;
@@ -39,10 +45,6 @@ export declare const zh: {
     'settings.readOnly': string;
     'settings.expand': string;
     'settings.collapse': string;
-    'settings.save': string;
-    'settings.saving': string;
-    'settings.discard': string;
-    'settings.unsaved': string;
     'settings.saveFailed': string;
     'settings.invalidValue': string;
     'presentation.ptc': string;

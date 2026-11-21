@@ -92,7 +92,26 @@ export interface PresetOverrides {
     presentation?: string;
     /** The `minimal-prompt` row's `dispatcher` switch. */
     dispatcher?: boolean;
+    /**
+     * Comma-separated on-demand tool families; written as an array to every row
+     * that pages from it (tool-catalog, tool-activate, working-context), skipped
+     * when blank or malformed.
+     */
+    pagedToolPatterns?: string;
+    /**
+     * Deferred idle-reclaim threshold in steps; written to every row that pages
+     * from the list (tool-catalog, tool-activate, working-context), skipped when
+     * absent.
+     */
+    idleReclaimSteps?: number;
 }
+/**
+ * Parse the on-demand tool family text: comma separated, each entry a prefix
+ * ending in exactly one trailing `*`.
+ * @param text - the settings text.
+ * @returns the pattern list, or undefined when the text is blank or any entry is malformed.
+ */
+export declare function parsePagedToolPatterns(text: string | undefined): string[] | undefined;
 /**
  * Apply the settings overlay to one parsed row list.
  *

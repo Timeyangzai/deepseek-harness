@@ -2,27 +2,27 @@
 
 English | [中文](README.zh.md)
 
-This directory contains three compatible plugin copies for Harness `0.2.1-rc.2` and six pinned npm plugins shared by Windows and macOS. [Desktop](../apps/desktop/README.md) owns platform packaging, signing and runtimes; application installers are not included here.
+This directory contains three compatible plugin copies for Harness `0.2.2-rc.5` and six pinned npm plugins shared by Windows and macOS. [Desktop](../apps/desktop/README.md) owns platform packaging, signing and runtimes; application installers are not included here.
 
 ## Plugins
 
 | Plugin | Version | Local behavior |
 | --- | --- | --- |
 | dsh-purge | 1.1.71 | Adapts prompts, live rollback and source Desktop launch; excludes #85/#86 to retain official steering and queuing; repairs retired redteam subagent fields while retaining maxDepth |
-| dsh-liangshen | 0.4.8 | Upstream rc.2 preset support; retains Purge prompt sections |
-| OpenCode Zen Free | 0.1.28 | Native model editing, catalog caching, connection compatibility and same-model protocol recovery |
-| dshmarket | 1.67.0 | Manage community plugins in Settings → Plugin Market |
-| billion-context | 0.1.208 | Preserve existing context settings |
-| dsh-free-search | 0.9.13 | Preserve existing search settings |
-| dsh-rewind-plugin | 0.18.0 | Preserve existing rewind settings |
-| dsh-goal | 0.2.33 | Installed dependency; not enabled by the shared profile |
-| dsh-input-traffic | 0.7.6 | Interrupt, steer or queue a message while a turn is running |
+| dsh-liangshen | 0.4.20 | Retains Purge prompt sections in the LiangShen preset |
+| OpenCode Zen Free | 0.1.28 | Supports Cordis Loader 1.1 and pi-ai 1.3, with model editing and same-model protocol recovery |
+| dshmarket | 1.74.0 | Manage community plugins in Settings → Plugin Market |
+| billion-context | 0.1.216 | Preserve existing context settings |
+| dsh-free-search | 0.9.78 | Preserve existing search settings |
+| dsh-rewind-plugin | 0.23.0 | Preserve existing rewind settings |
+| dsh-goal | 0.2.46 | Installed dependency; not enabled by the shared profile |
+| dsh-input-traffic | 0.7.17 | Interrupt, steer or queue a message while a turn is running |
 
 See [versions.json](versions.json) for origins and checksums. Unmodified third-party READMEs retain upstream filenames and are outside the main repository's bilingual pairing.
 
 ## Windows / macOS installation
 
-Follow the main repository instructions to run `pnpm install` and `pnpm run build`; the installer requires the built atomic-write utility. Start Desktop once to initialize its profile, then fully quit through the application menu; keep Desktop closed during installation.
+Follow the main repository instructions to run `pnpm install` and `pnpm run build`; the installer requires the built atomic-write utility. Start Desktop `0.2.2-rc.5` once to initialize its profile, then fully quit through the application menu; keep Desktop closed during installation.
 
 Run from the repository root, replacing the example with the actual Desktop data directory rather than the application installation directory:
 
@@ -33,13 +33,13 @@ node compat-plugins/install.mjs --dsh-home "/absolute/path/to/dsh-home"
 
 Windows accepts `"C:/path/to/dsh-home"`; use the actual path on macOS. No user directory is hardcoded. Add `--offline` when every dependency is cached; `--pnpm-entry` selects another `pnpm.mjs`.
 
-The installer backs up the manifest, existing lockfile and local plugins to `$DSH_HOME/plugin-backups/compat-*`, copies three compatible plugins, then merges nine dependencies and the template’s selected bundles and runs pnpm. Existing model settings, credentials, sessions and other plugins remain unchanged; repeated runs do not duplicate selections.
+The installer backs up the manifest, existing lockfile and local plugins to `$DSH_HOME/plugin-backups/compat-*`, copies three compatible plugins, then merges nine dependencies and the template’s selected bundles and runs pnpm. It drops the retired `@deepseek-ai/dsh-experimental-agent-team-profile` package and bundle selection. Existing model settings, credentials, sessions and other plugins remain unchanged; repeated runs do not duplicate selections.
 
 If pnpm fails, the original manifest and previous lockfile are restored and the backup location is reported; local plugin copies and node_modules may have changed. Keep Desktop closed and repair from the backup or resolve the network issue before retrying; do not assume every file was rolled back.
 
 Restart Desktop and check Plugin Market and installed plugin status; check and apply dsh-purge patches as needed. LiangShen presets should be selectable; move an old `.agent-presets/liangshen` directory to a backup if it overrides plugin presets.
 
-The legacy `install-windows.ps1` still installs only Purge and LiangShen with offline pnpm; use the shared entry for the complete set. Desktop supports Windows x64 and macOS arm64/x64. This installer was exercised on Windows; macOS installation, signing and packaging still require verification on a Mac.
+The legacy `install-windows.ps1` still installs only Purge and LiangShen with offline pnpm; use the shared entry for the complete set. Desktop supports Windows x64 and macOS arm64/x64. macOS installation, signing and packaging require verification on a Mac.
 
 ## Busy-time input
 
@@ -49,9 +49,9 @@ The legacy `install-windows.ps1` still installs only Purge and LiangShen with of
 - Yellow, **Send after action**: process the message after the current step finishes.
 - Green, **Queue for next turn**: wait until the current turn finishes; this is the default for plain Enter.
 
-Interrupting preserves completed actions and any output already shown. Windows Desktop verification stopped a streaming response, admitted the selected message once and completed its reply; it did not exercise interruption of a running tool. The plugin's 71 upstream tests passed. macOS runtime verification remains required.
+Interrupting preserves completed actions and any output already shown.
 
-After updating billion-context, fully quit and restart Desktop to reload model-capacity metadata. Windows verification with 0.1.208 completed a 918-token response without the stale 256-token ceiling; actual output capacity still depends on the selected provider and model.
+After updating billion-context, fully quit and restart Desktop to reload model-capacity metadata. Actual output capacity depends on the selected provider and model.
 
 ## Purge backup and recovery
 
@@ -97,6 +97,6 @@ node --test compat-plugins/dsh-purge/tests/harness-021.test.mjs compat-plugins/d
 pnpm exec vitest run --config compat-plugins/vitest.config.ts
 ```
 
-Automated tests use private temporary directories, deterministic package-manager fixtures and mocked network calls; they require neither cached packages nor a model key. A real Windows offline installation was verified separately. Windows results do not replace macOS hardware verification.
+Automated tests use private temporary directories, deterministic package-manager fixtures and mocked network calls; they require neither cached packages nor a model key.
 
 `output/`, `.playwright-cli/`, `.desktop-build/` and `*.dshpurge.bak` are local artifacts excluded from Git. Proxy settings, egress pools, sessions, credentials and screenshots stay local; the published directory contains none of those data.

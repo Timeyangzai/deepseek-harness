@@ -28,7 +28,7 @@
  */
 import type { ConfigForm, ConfigForms } from '@deepseek-ai/dsh-client-ui-settings/client';
 /** Options of {@link createServedEntryForm}. */
-export interface ServedEntryFormOptions<T> {
+export interface ServedEntryFormOptions<_T> {
     /** The shared configuration forms service (`ctx.configForms`). */
     forms: ConfigForms;
     /**

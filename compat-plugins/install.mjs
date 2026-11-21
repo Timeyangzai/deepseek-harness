@@ -24,6 +24,7 @@ const profile = join(home, 'profiles', 'desktop');
 const manifestPath = join(profile, 'package.json');
 const template = JSON.parse(readFileSync(join(root, 'desktop-profile', 'package.json'), 'utf8'));
 const pnpm = resolve(options['pnpm-entry'] ?? join(root, '..', 'node_modules', 'pnpm', 'bin', 'pnpm.mjs'));
+const retiredBundle = '@deepseek-ai/dsh-experimental-agent-team-profile';
 const local = Object.entries(template.dependencies).filter(([, spec]) => spec.startsWith('file:'));
 const copies = local.map(([name, spec]) => {
   const folder = spec.split('/').at(-1);
@@ -36,7 +37,8 @@ if (!Array.isArray(current.dsh?.profile?.bundles)) throw new Error('Desktop prof
 if (!existsSync(pnpm)) throw new Error(`pnpm entry not found: ${pnpm}; run pnpm install in this checkout first.`);
 
 if (options.plan) {
-  console.log(JSON.stringify({ home, profile, dependencies: template.dependencies, copies, offline: !!options.offline }, null, 2));
+  const removeBundles = current.dsh.profile.bundles.filter(name => name === retiredBundle);
+  console.log(JSON.stringify({ home, profile, dependencies: template.dependencies, copies, removeBundles, offline: !!options.offline }, null, 2));
 } else {
   await withFileLock(manifestPath, async () => {
     // Re-read after acquiring the writer lock so another completed operation is retained.
@@ -56,6 +58,8 @@ if (options.plan) {
       cpSync(source, target, { recursive: true });
     }
     manifest.dependencies = { ...manifest.dependencies, ...template.dependencies };
+    delete manifest.dependencies[retiredBundle];
+    manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter(name => name !== retiredBundle);
     for (const name of template.dsh.profile.bundles) {
       if (!manifest.dsh.profile.bundles.includes(name)) manifest.dsh.profile.bundles.push(name);
     }

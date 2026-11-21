@@ -5,24 +5,47 @@
 # presentation declared for the session's whole lifetime instead of a staged
 # turn boundary.
 #
-# The presentation is the SDK's ToolPresentationMode, picked by the
+# The presentation is the SDK's tool presentation mode, picked by the
 # tool-catalog row's `presentation` key (default `'ptc'`): `'native'` keeps
-# the assembled roster on the wire, and `'ptc'` collapses the wire to the
-# single `run_code` transport with every other tool reached from inside the
-# program through the generated SDK. The declaration lands once per agent
-# scope through agent.ctx.tools.presentAs as early as the scope exists, and
-# degrades to the native surface with a one-time warning when the deployment
-# has no code runtime or the host declines. The retired anchor-turn staging is
-# gone: the legacy `anchorTools` and boolean `ptcPresentation` keys are still
-# accepted (the latter mapping true -> 'ptc' and false -> 'native') but only
-# warn once.
+# the roster on the wire, and `'ptc'` collapses the wire to the single
+# `run_code` transport with every other tool reached from inside the program
+# through the generated SDK. The settings overlay turns that key into the
+# `tool-executor-ptc` row below, which is what actually decides the wire:
+# 0.2.2 retired `agent.ctx.tools.presentAs`, so no plugin declares it per
+# scope any more, and a deployment with no code runtime keeps the native
+# surface. The retired anchor-turn staging is gone: the legacy `anchorTools`
+# and boolean `ptcPresentation` keys are still accepted (the latter mapping
+# true -> 'ptc' and false -> 'native') but only warn once.
 #
 # Gentle tool paging keeps high-fan-out families out of reach until needed:
-# tools matching `pagedToolPatterns` (default `mcp__*`) stay paged out, the
-# durable tool-catalog message summarizes their namespaces with an activation
-# pointer, and the preset's own `tool_activate` tool (the tool-activate row)
-# loads one namespace back — at most three stay active, LRU eviction pages the
-# oldest back out. The activation state replays from the durable session event
+# tools matching `pagedToolPatterns` — by default the MCP bridge plus the plugin
+# families `browser_*`, `task_board_*`, `team_*`, `squad*`, `ui_*` and
+# `ssh_*` — stay paged out, the durable tool-catalog message summarizes their
+# namespaces with an activation pointer, and the preset's own `tool_activate`
+# tool (the tool-activate row) loads one namespace back — at most three stay
+# active, LRU eviction pages the oldest back out. Optional deferred idle
+# reclaim (`idleReclaimSteps`, default 0 = off): a namespace idle for N steps
+# expires, but the replay removes it only at the next activation or a
+# compaction boundary — moments the prompt prefix changes anyway — so reclaim
+# never adds a prefix-cache rebuild (issue #2066). The pattern's own head decides
+# the family: a head ending in `__` is an MCP bridge and takes the first `__`
+# segment of the tool name (`mcp__codegraph__x` -> `codegraph`), any other head
+# names the family literally with one trailing `_` dropped (`task_board_*` ->
+# `task_board`), so `squad*` covers `squads_*` and `squad_member_*` alike.
+# Every host builtin the rows below mount stays resident: no shipped pattern
+# names one, so the shell, filesystem, job, skill, delegation, plan, goal and web
+# tools never page.
+# The pattern list is ONE fact shared by THREE rows: `tool-catalog` installs the
+# registry restriction, `tool-activate` replays the log to answer it, and
+# `working-context` renders the resulting active set. All three therefore carry
+# the same shipped list and the settings overlay rewrites all three together: a
+# row left on its own default would disagree about what is active, and the
+# activation tool would refuse to re-activate a namespace the registry had
+# already withheld. `idleReclaimSteps` is the same kind of shared fact: the
+# deferred-reclaim threshold (0 = off, the shipped behavior) must reach all
+# three replays together, or the catalog would withhold a namespace the
+# activation tool still reports as active.
+# The activation state replays from the durable session event
 # stream on every assembly, so resume and compaction rebuild it without process
 # memory. Paging is enforced twice, because the wire is not the only surface a
 # tool can be reached through: the assembled tool list loses the paged families,
@@ -79,6 +102,11 @@
 # (decide the next operation, never pre-rehearse implementations in thought),
 # and YAGNI/PDCA with no redundant comments. Runtime context snapshots stay
 # enabled: they are durable user-role messages, not system-prompt text.
+#
+# The convergence bound is stated as "stop repeating an inspection whose answer
+# you already hold", not as a turn count: a numeric cap is read at its strictest
+# end and swallows the cheap check that would settle an open question, which is
+# the opposite of what the fuse is for (2026-10-18).
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
@@ -90,7 +118,7 @@
       - Parallel Inspection: When several independent inspections, searches, or checks are needed, emit all of their tool calls in a single turn rather than across sequential rounds. The harness executes independent read-only calls in parallel. When two or more of those targets are the same kind of step, batch them into one run_code program instead and keep only its conclusion.
       - Shell Discipline: Shell processes are ephemeral; directory changes do not persist across tool calls. Use compound commands (e.g. cd <path> && <cmd>) or pass workdir explicitly for operations in subdirectories.
       - Development Standard: Follow YAGNI and the PDCA loop. Each step verifies a single assumption. Do not write redundant comments.
-      - Bounded Inspection & Convergence: Do not traverse dependency chains unbounded. Limit pre-action inspection to immediate target files (at most 2-3 inspection turns). Once core context is understood, immediately converge and begin answering or making edits. Verify edge cases during post-edit testing rather than over-reading upfront.
+      - Bounded Inspection & Convergence: Do not traverse dependency chains unbounded. Stop repeating an inspection whose answer you already hold: re-reading the same target to answer the same question is not progress. A concrete hypothesis with a cheap check is different: run it. Once core context is understood, immediately converge and begin answering or making edits. Verify edge cases during post-edit testing rather than over-reading upfront.
       - Bounded Output: never dump a large or unbounded command output into the conversation. Filter at the source with grep/head/tail/wc and read the narrow range you actually need; the model's long-range attention is a bounded budget and raw logs evict the session's own constraints from it.
 
 # The mode's preset-local plugins:
@@ -118,7 +146,9 @@
 # #49: a full-text dump as context measurably flips the trajectory). Both
 # non-default modes trade the harness's own channel for a preset-owned one; the
 # default keeps the upstream contract. Set `keepPlanPolicy: false` to drop
-# plan mode's policy section as well.
+# plan mode's policy section as well. `keepSections` (default []) appends
+# explicitly named third-party sections to that fail-closed allowlist; a name
+# absent from an assembly logs a diagnostic instead of failing silently.
 #
 # `dispatcher` (default true) is orthogonal to `presentation`: it changes the
 # PROMPT, not the wire. On, the persona section additionally carries the
@@ -135,8 +165,11 @@
 # the assembled roster alone. The shipped default is a static-context choice,
 # not a measured win: the official scaffold comparison ranks this presentation
 # below the native surface on both code-agent benchmarks, and the bundled
-# benchmark matrix is how that trade would be settled locally. `pagedToolPatterns` (default `['mcp__*']`) names the
-# high-fan-out families that stay paged out of the wire until activated; the
+# benchmark matrix is how that trade would be settled locally.
+# `pagedToolPatterns` names the high-fan-out families that stay paged out of the
+# wire until activated: the MCP bridge plus the plugin families `browser_*`,
+# `task_board_*`, `team_*`, `squad*`, `ui_*` and `ssh_*`. Every host builtin
+# the rows below mount stays resident, because no shipped pattern names one; the
 # active set replays from the session event stream, so resume and compaction
 # rebuild it. `maxResidentTokens` (default 6000, calibrated above the shipped
 # roster so the guard flags real growth rather than the factory configuration)
@@ -164,6 +197,7 @@
   name: ./minimal-prompt.mjs
   config:
     keepPlanPolicy: true
+    keepSections: []
     instructionSource: host
     instructionMaxBytes: 65536
     # Append the dispatcher rule block to the persona (orthogonal to the wire
@@ -177,17 +211,51 @@
   config:
     descriptionMaxLength: 200
     presentation: 'ptc'
-    pagedToolPatterns: ['mcp__*']
+    pagedToolPatterns: ['mcp__*', 'browser_*', 'task_board_*', 'team_*', 'squad*', 'ui_*', 'ssh_*']
     maxResidentTokens: 8000
+    idleReclaimSteps: 0
 
+# ── the wire ────────────────────────────────────────────────────────────────
+#
+# `presentation` on the `tool-catalog` row above IS the wire, because the
+# settings overlay turns it into the `tool-executor-ptc` row below: a mounted
+# ptc executor collapses the wire to the single `run_code` transport, and the
+# `native` value disables that row so the roster is what the request carries.
+# The catalog reads the same fact back (a `ptc` setting plus a mounted
+# runtime) because no reader can observe the collapse itself: the ptc
+# executor keeps `run_code` outside the registry, so a schema read returns the
+# same list under both modes.
+#
+# This cohort splits execution into an agent-scoped executor row. The row below
+# selects the same official PTC executor as the builtin ptc preset; the settings
+# overlay disables it for native presentation so the two modes stay distinct.
+#
+# The row ships `presentation: 'ptc'` because that is the shipped default, and
+# the settings overlay rewrites the SAME key, so the settings switch and the
+# composition never disagree.
+
+# The working-context line folds the SAME active set the catalog pages from, so
+# this row carries the same `pagedToolPatterns` list as the tool-catalog row:
+# two pattern sources would let the rendered line name a namespace active that
+# the registry has already withheld.
 - id: working-context
   name: ./working-context.mjs
+  config:
+    pagedToolPatterns: ['mcp__*', 'browser_*', 'task_board_*', 'team_*', 'squad*', 'ui_*', 'ssh_*']
+    idleReclaimSteps: 0
 
 # The paging activation handle the catalog points at: with `pagedToolPatterns`
 # non-empty this row is what lets `tool_activate({ namespace })` bring one
 # paged namespace back onto the wire (and the generated SDK) for the session.
+# It carries the SAME list as the tool-catalog and working-context rows, because
+# it replays the log with its own copy: a different list would let it answer
+# "already active" for a namespace the catalog's restriction had withheld,
+# leaving that namespace unreachable for the rest of the session.
 - id: tool-activate
   name: ./tool-activate.mjs
+  config:
+    pagedToolPatterns: ['mcp__*', 'browser_*', 'task_board_*', 'team_*', 'squad*', 'ui_*', 'ssh_*']
+    idleReclaimSteps: 0
 
 # The key-fact register: the model pins a hard constraint / confirmed decision /
 # failed path with `fact_register`, the fold rebuilds the register from the
@@ -197,6 +265,38 @@
 # forgetting; the fold replays identically after resume and compaction.
 - id: fact-ledger
   name: ./fact-ledger.mjs
+
+# The child-route guard. The harness records a Session's authorized child
+# routes as a durable `subagent/model-selection-policy` event, but its own
+# delegation tool only rejects an EXPLICIT route outside that list: a call that
+# names no `provider`/`model` inherits the parent route unchecked, and an
+# inherit-only tool such as `subagent_fork` cannot name one at all. This row
+# closes that gap on the preset plane — an allowlist-carrying Session must
+# resolve every policed delegation to an authorized route, and a refusal names
+# the routes that would work. It fails open on every fact it cannot read (no
+# policy event, no session registry, no registry probe), so a Host that cannot
+# answer keeps the harness's own delegation behavior.
+- id: subagent-routes
+  name: ./subagent-routes.mjs
+
+# The dispatch execution guard. A preset row composes ONE tool registry, and an
+# in-process child agent inherits that composition, so two things break quietly:
+# a child calls a coordinator-only tool (ask_user_question, the plan-mode
+# transitions, create_goal / update_goal, present) and splits one decision into
+# two - the child asks, the user answers, and the dispatcher never learns what
+# was asked; or a caller sleeps to wait for a child that the built-in completion
+# notification will wake it for. This row refuses both at call execution time: a
+# delegated caller is told to hand the open question back to the dispatcher, and
+# a pure sleep statement (a wait beside nothing but no-ops) is refused while one
+# of its children is still running. It uses ONLY `ctx.tools.guard()`, so the
+# declared tool surface does not move by a byte and a prefix-caching provider
+# never rebuilds because of this row. Every fact it cannot read fails open (no
+# agents service, no roots, a throwing probe), so a host that cannot answer keeps
+# the harness's own behaviour instead of failing the preset's load. It
+# deliberately has no settings-card field: the row's own `enabled` key is the off
+# switch, exactly as for `subagent-routes` above.
+- id: dispatch-guard
+  name: ./dispatch-guard.mjs
 
 # The harness's workspace-instruction loader. Under the default
 # `instructionSource: host` this row owns the channel: its baseline and dynamic
@@ -272,12 +372,18 @@
 
 # ── goals ───────────────────────────────────────────────────────────────────
 
-# Only the model-facing tool. The goal SERVICE, its session driver, and the
-# `/goal` command stay on the host plane: the Gateway serves the goal domain as
-# Remote endpoints whose receiver comes from a generated descriptor, so it
-# resolves `goals` on the host and an entry-local realm here would hide it. The
-# registry is keyed by session anyway, so one host instance serves every
-# session. What a preset chooses is whether its agent can call the goal tool.
+# The goal SERVICE and its session driver stay on the host plane: the Gateway
+# serves the goal domain as Remote endpoints whose receiver comes from a
+# generated descriptor, so it resolves `goals` on the host and an entry-local
+# realm here would hide it. The registry is keyed by session anyway, so one
+# host instance serves every session. What a preset mounts is the domain's two
+# consumers, and both are plain top-level rows: the human `/goal` command, whose
+# producer the Web bundle disables on the host and leaves to the agent preset,
+# and the model-facing goal tool. The builtin `standard`, `ptc`, and `cordis`
+# presets declare exactly this pair.
+- id: command-goal
+  name: '@deepseek-ai/dsh-command-goal'
+
 - id: tool-goal
   name: '@deepseek-ai/dsh-tool-goal'
 
@@ -367,33 +473,41 @@
     - id: tool-subagent-control
       name: '@deepseek-ai/dsh-tool-subagent-control'
 
-    - id: tool-subagent-list-agents
-      name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+    # Do not add a `@deepseek-ai/dsh-tool-subagent-control/list-agents` row
+    # back: DSH 0.2.1-rc.3 dropped that subpath export, and the control row above
+    # registers `list_agents` from its own `apply()`. A row naming the removed
+    # subpath makes the whole preset fail to mount
+    # (`tool-subagent-list-agents ... never started`), issue #1940.
 
-    # `modelSelectionSettings: true` opts this row into the child-model
-    # selection the Web settings page owns per Session: the tool then
-    # publishes `provider` / `model` / `reasoning_effort` parameters and the
-    # `list_subagent_models` discovery tool, and an explicit route is
-    # checked against the Session's allowed list. Without it the settings
-    # toggle reads as dead under this preset and an explicit selection
-    # fails with `child model selection is disabled for this tool instance`.
+    # Child-model selection is TWO upstream knobs and this row sets both:
+    # `modelSelection` publishes the `provider` / `model` /
+    # `reasoning_effort` parameters on `subagent` (an explicit route is
+    # checked against the Session's allowed list, falling back to the parent
+    # route when no policy was recorded), and `modelDiscovery` registers the
+    # `list_subagent_models` discovery tool. Without them an explicit
+    # selection fails with `child model selection is disabled for this tool
+    # instance` and the settings page's subagent toggle reads as dead.
     #
-    # EXACTLY ONE delegation row per composition scope may opt in. The
-    # opt-in registers the discovery tool under the FIXED name
+    #
+    # EXACTLY ONE delegation row per composition scope may enable
+    # `modelDiscovery`: it registers the discovery tool under the FIXED name
     # `list_subagent_models` in the scope the row composes into, and the tool
     # registry refuses a second registration of one name in one scope, so a
-    # second opt-in row fails the whole session with `tool
+    # second discovery owner fails the whole session with `tool
     # 'list_subagent_models' is already registered in this scope`. The fork
-    # row below therefore stays without it, exactly as the builtin Standard,
-    # PTC, and Cordis presets ship: their `tool-subagent` row opts in and
-    # their `tool-subagent-fork` row does not. Do not complete the
-    # fork row to match; the opt-in belongs to the spawn row alone.
+    # row below therefore leaves discovery off, exactly as the builtin
+    # Standard, PTC, and Cordis presets ship: their `tool-subagent` row opts
+    # in and their `tool-subagent-fork` row does not. Do not complete the
+    # fork row to match; discovery belongs to the spawn row alone. The route
+    # fields alone are per instance upstream, and the fork row leaves those
+    # off too, matching the shipped official roster.
     - id: tool-subagent
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
         provider: spawn
         toolName: subagent
-        modelSelectionSettings: true
+        modelSelection: true
+        modelDiscovery: true
 
     - id: tool-subagent-fork
       name: '@deepseek-ai/dsh-tool-subagent'
@@ -456,3 +570,9 @@
   config:
     fetch: false
     searchTimeoutMs: 60000
+
+# PTC execution is an agent-scoped plugin in this cohort, and this row IS the
+# presentation: the settings overlay disables it for the native presentation.
+# Without that executor the wire has no `run_code` to carry a program.
+- id: tool-executor-ptc
+  name: '@deepseek-ai/dsh-tool-executor-ptc'

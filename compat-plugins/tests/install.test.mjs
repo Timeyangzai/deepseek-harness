@@ -28,9 +28,10 @@ test('plan leaves user files and plugin directories untouched', t => {
   const original = readFileSync(join(profile, 'package.json'));
   const result = run(root, ['--plan']);
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(JSON.parse(result.stdout).dependencies.dshmarket, '1.67.0');
-  assert.equal(JSON.parse(result.stdout).dependencies['dsh-input-traffic'], '0.7.6');
-  assert.equal(JSON.parse(result.stdout).dependencies['billion-context'], '0.1.208');
+  const { dependencies } = JSON.parse(result.stdout);
+  assert.equal(dependencies.dshmarket, '1.74.0');
+  assert.equal(dependencies['dsh-input-traffic'], '0.7.17');
+  assert.equal(dependencies['billion-context'], '0.1.216');
   assert.deepEqual(readFileSync(join(profile, 'package.json')), original);
   assert.equal(existsSync(join(root, 'local-plugins')), false);
 });
@@ -43,11 +44,11 @@ test('install passes offline mode, retains user data and existing bundles, and i
     assert.equal(result.status, 0, result.stdout + result.stderr);
   }
   const manifest = JSON.parse(readFileSync(join(profile, 'package.json')));
-  assert.equal(manifest.dependencies.dshmarket, '1.67.0');
+  assert.equal(manifest.dependencies.dshmarket, '1.74.0');
   assert.equal(manifest.dsh.profile.bundles.filter(x => x === 'dshmarket').length, 1);
-  assert.equal(manifest.dependencies['dsh-input-traffic'], '0.7.6');
+  assert.equal(manifest.dependencies['dsh-input-traffic'], '0.7.17');
   assert.equal(manifest.dsh.profile.bundles.filter(x => x === 'dsh-input-traffic').length, 1);
-  assert.equal(manifest.dependencies['billion-context'], '0.1.208');
+  assert.equal(manifest.dependencies['billion-context'], '0.1.216');
   assert.ok(manifest.dsh.profile.bundles.includes('@deepseek-ai/dsh-base'));
   assert.deepEqual(JSON.parse(readFileSync(join(profile, 'pnpm-arguments.json'))), ['--dir', profile, 'install', '--optimistic-repeat-install=false', '--offline']);
   assert.equal(readFileSync(join(profile, 'cordis.patch.yml'), 'utf8'), '# preserve settings\n');
@@ -80,8 +81,33 @@ test('dependency updates retain an installed bundle that is not enabled', t => {
   assert.equal(result.signal, null, result.stderr);
   assert.equal(result.status, 0, result.stdout + result.stderr);
   const installed = JSON.parse(readFileSync(path));
-  assert.equal(installed.dependencies['@goodandready/dsh-goal'], '0.2.33');
+  assert.equal(installed.dependencies['@goodandready/dsh-goal'], '0.2.46');
   assert.equal(installed.dsh.profile.bundles.includes('@goodandready/dsh-goal'), false);
+});
+
+test('upgrade removes the retired AgentTeam bundle and preserves custom bundles', t => {
+  const { root, profile } = fixture(t);
+  const manifestPath = join(profile, 'package.json');
+  const previous = JSON.parse(readFileSync(manifestPath));
+  const retired = '@deepseek-ai/dsh-experimental-agent-team-profile';
+  const custom = 'custom-plugin';
+  previous.dependencies[retired] = '0.2.1-rc.2';
+  previous.dependencies[custom] = '1.0.0';
+  previous.dsh.profile.bundles.push(retired, custom);
+  writeFileSync(manifestPath, JSON.stringify(previous) + '\n');
+
+  const plan = run(root, ['--plan']);
+  assert.equal(plan.status, 0, plan.stderr);
+  assert.deepEqual(JSON.parse(plan.stdout).removeBundles, [retired]);
+  assert.deepEqual(JSON.parse(readFileSync(manifestPath)), previous);
+
+  const result = run(root);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const installed = JSON.parse(readFileSync(manifestPath));
+  assert.equal(Object.hasOwn(installed.dependencies, retired), false);
+  assert.equal(installed.dsh.profile.bundles.includes(retired), false);
+  assert.equal(installed.dependencies[custom], '1.0.0');
+  assert.equal(installed.dsh.profile.bundles.includes(custom), true);
 });
 
 test('a held profile lock prevents mutations', t => {

@@ -108,6 +108,14 @@ export declare class LeverController {
     /** Ceiling on one in-flight switch, so a lost Remote answer cannot hang the row. */
     private readonly selectTimeoutMs;
     private readonly disposers;
+    /** The one face this controller hands out: the view reads it on every render. */
+    private cachedFace;
+    /**
+     * The translator bound to this plugin's locale namespace, resolved on first
+     * use. A lookup that resolved nothing is never cached, so a locale service
+     * registered after activation still reaches the same face.
+     */
+    private cachedTranslate;
     constructor(ctx: ClientContext, options?: LeverControllerOptions);
     /** The snapshot store the view subscribes to. */
     snapshot(): SnapshotStore<LeverSnapshot>;
@@ -115,8 +123,14 @@ export declare class LeverController {
     start(): void;
     /** Release every subscription. Idempotent. */
     dispose(): void;
-    /** The inject face handed to the slot entry. */
+    /** The inject face handed to the slot entry; the same instance on every read. */
     face(): LeverFace;
+    /**
+     * The translator bound to this plugin's locale namespace, or undefined while
+     * none answers. The binding is resolved once and only on success: a locale
+     * service that arrives later than this controller still gets its chance.
+     */
+    private translate;
     /** Read the roster; a refusal leaves the lever as it was. */
     load(): Promise<void>;
     /**
@@ -125,6 +139,8 @@ export declare class LeverController {
      * and the burst counter belong to the gesture, not to a session refresh.
      */
     refresh(): void;
+    /** Display name of the preset a push-up would restore; empty when there is none. */
+    private restoreLabelOf;
     /** The verb behind one gesture direction. */
     private toggle;
     /**
@@ -133,7 +149,15 @@ export declare class LeverController {
      */
     private detectPreset;
     private rememberPrevious;
-    /** The facts one decision reads, from the live session and the roster. */
+    /**
+     * The facts one decision reads, from the live session and the roster.
+     *
+     * `previous` is resolved only for a blank session: it exists to name the
+     * preset a push-up restores, and only a blank session may switch preset at
+     * all. Resolving it costs a DOM chip lookup and a session-storage read
+     * ({@link detectPreset}), which a started session -- reported as 'locked' or
+     * 'missing' -- would pay for on every roster and session update and never use.
+     */
     private facts;
     private currentSessionId;
     private currentSession;

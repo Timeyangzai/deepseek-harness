@@ -12,7 +12,13 @@
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots';
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store';
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client';
-import { type CardActions, type CardShell, type FieldState as CardFieldState } from './settings-form.ts';
+import { type CardActions, type CardShell, type FieldSpec, type FieldState as CardFieldState } from './settings-form.ts';
+/**
+ * The on-demand tool family list: comma separated entries, each a prefix with
+ * one trailing star. Blank clears the field; any malformed entry holds the
+ * draft unwritten.
+ */
+export declare function pagedToolPatternsField(field: string): FieldSpec;
 /** Wire presentations the tool catalog accepts (mirrors the Host schema). */
 export declare const PRESENTATION_CHOICES: readonly ["ptc", "native"];
 /** The LiangShen fields this card edits (the namespace's full schema). */
@@ -25,6 +31,10 @@ export interface LiangShenSettings {
     presentation?: string;
     /** Whether the preset appends the dispatcher rules section after the persona. */
     dispatcher?: boolean;
+    /** Comma-separated on-demand tool families the Host writes to the tool-catalog row. */
+    pagedToolPatterns?: string;
+    /** Deferred idle-reclaim threshold in steps the Host writes to every paging row. */
+    idleReclaimSteps?: number;
 }
 /** What the LiangShen card renders. */
 export interface LiangShenSettingsCardState extends CardShell {
@@ -32,6 +42,8 @@ export interface LiangShenSettingsCardState extends CardShell {
     announceToAgent: CardFieldState;
     presentation: CardFieldState;
     dispatcher: CardFieldState;
+    pagedToolPatterns: CardFieldState;
+    idleReclaimSteps: CardFieldState;
 }
 /** The registration-side face the card's slot entry injects. */
 export interface LiangShenSettingsCardFace extends CardActions {

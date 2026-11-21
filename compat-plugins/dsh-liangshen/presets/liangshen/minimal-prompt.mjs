@@ -7,9 +7,10 @@
  *
  * The assembled prompt is filtered down to the persona section, plus the plan
  * policy when plan mode is active, plus the official PTC tool SDK sections
- * (`tools:sdk` and `tools:ptc-only`) exactly when the assembled wire carries
- * the `run_code` transport (presentation 'ptc'; an unreadable wire
- * keeps them, matching the harness's own empty-section drop): the harness
+ * (`tools:sdk` and `tools:ptc-only`) exactly when the effective wire carries
+ * the `run_code` transport (presentation 'ptc'). Legacy hosts expose the final
+ * tools array; current hosts use the sibling-published transport, while a
+ * standalone assembly with neither signal keeps the historical fallback. The harness
  * identity, web-surface, tool-guidance, file-reference, and structured-output
  * sections never reach the model. Keeping the official SDK sections when the
  * transport is present ensures the model receives the complete generated tool
@@ -82,7 +83,8 @@
  *
  * PLAN MODE is kept by default. `dsh-plan-mode` enforces its rules through
  * the `plan:policy` prompt section alone. `keepPlanPolicy: false` restores the
- * strict one-line surface.
+ * strict one-line surface. `keepSections` (default []) explicitly appends
+ * third-party section names to the allowlist and warns once for an unmatched name.
  *
  * DISPATCHER RULES (`dispatcher`, default `true`): the switch appends
  * `./dispatcher-rules.mjs` to the persona text, after the workspace line, under
@@ -98,6 +100,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import { DISPATCHER_RULES, DISPATCHER_RULES_APPENDIX, DISPATCHER_RULES_WITH_APPENDIX } from './dispatcher-rules.mjs'
+import { wirePresentationFor } from './wire-presentation.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'liangshen-minimal-prompt'
@@ -176,6 +179,14 @@ function optionalBoolean(value, field, fallback) {
     throw new TypeError(`${name}: ${field} must be a boolean`)
   }
   return value
+}
+
+function optionalKeepSections(value) {
+  if (value === undefined) return []
+  if (!Array.isArray(value) || value.some(sectionName => typeof sectionName !== 'string' || sectionName.length === 0)) {
+    throw new TypeError(`${name}: keepSections must be an array of non-empty strings`)
+  }
+  return [...new Set(value)]
 }
 
 function optionalSource(value, field, fallback) {
@@ -747,6 +758,7 @@ export function withWorkspaceLine(sections, agent, dispatcher = false) {
 /** Register the section filter, workspace-instruction source, and dynamic discovery hooks. */
 export function apply(ctx, config) {
   const keepPlanPolicy = optionalBoolean(config?.keepPlanPolicy, 'keepPlanPolicy', true)
+  const keepSections = optionalKeepSections(config?.keepSections)
   const dispatcher = optionalBoolean(config?.dispatcher, 'dispatcher', true)
   const instructionSource = optionalSource(config?.instructionSource, 'instructionSource', 'host')
   const instructionMaxBytes = optionalByteSize(config?.instructionMaxBytes, 'instructionMaxBytes', DEFAULT_INSTRUCTION_MAX_BYTES)
@@ -765,20 +777,26 @@ export function apply(ctx, config) {
       }
       sessionStateMap.set(session, state)
 
-      // Reconstruct touched directories from durable history if available
-      if (typeof session?.snapshotEvents === 'function') {
+      // Reconstruct touched directories from the durable history, but ONLY in
+      // system-prompt mode: that is the one mode that discovers subdirectory
+      // instructions itself, so the other two never pay for a log read they
+      // cannot use (the harness's own row, or the hint, owns the channel there).
+      if (instructionSource === 'system-prompt' && typeof session?.snapshotEvents === 'function') {
         try {
           const events = session.snapshotEvents()
           const cwd = session.header?.cwd ?? process.cwd()
           for (const ev of events) {
-            if (ev?.type === 'tool/call' && ev.data) {
-              let args = ev.data.arguments
-              if (typeof args === 'string') {
-                try { args = JSON.parse(args) } catch {}
-              }
-              const p = filePathFromExecution({ name: ev.data.name, arguments: args })
-              if (p) state.touchedDirs.add(dirname(resolve(cwd, p)))
+            // Both wire shapes count: a top-level call, and the program dispatch
+            // a PTC session records for the same tool. A dispatch that reported
+            // an error touched nothing.
+            if (ev?.type !== 'tool/call' && ev?.type !== 'tool/ptc-dispatch') continue
+            if (!ev.data || ev.data.isError === true) continue
+            let args = ev.data.arguments
+            if (typeof args === 'string') {
+              try { args = JSON.parse(args) } catch {}
             }
+            const p = filePathFromExecution({ name: ev.data.name, arguments: args })
+            if (p) state.touchedDirs.add(dirname(resolve(cwd, p)))
           }
         } catch {
           // Replay reconstruction fallback
@@ -787,6 +805,8 @@ export function apply(ctx, config) {
     }
     return state
   }
+
+  const warnedKeepSections = new Set()
 
   let warned = false
   const warnOnce = (message) => {
@@ -803,18 +823,33 @@ export function apply(ctx, config) {
   ctx.on('system-prompt/assemble', async (_assembly, context, next) => {
     const assembled = await next()
     if (!Array.isArray(assembled.sections)) return assembled
-    // The official SDK sections belong to the run_code transport: keep them
-    // exactly when this assembly's wire carries it ('ptc'), drop
-    // them from a native wire they would only confuse. An unreadable wire keeps
-    // them, matching the harness's own empty-section drop under 'native'.
+    // Old hosts exposed the final tool array here; current hosts expose only
+    // sections, so the sibling tool-catalog publishes the effective transport
+    // before this waterfall continues. Standalone use with neither signal keeps
+    // the historical fail-open behavior for these two SDK sections.
     const wire = Array.isArray(assembled?.tools) ? assembled.tools : undefined
-    const wireHasRunCode = wire === undefined ? true : wire.some(tool => tool?.name === 'run_code')
+    const presentation = wirePresentationFor(context?.agent)
+    const wireHasRunCode = wire !== undefined
+      ? wire.some(tool => tool?.name === 'run_code')
+      : presentation === undefined ? true : presentation === 'ptc'
     const keep = new Set([
       ...PERSONA_SECTION_NAMES,
       ...(keepPlanPolicy ? [PLAN_POLICY_SECTION_NAME] : []),
       ...(wireHasRunCode ? PTC_SECTION_NAMES : []),
+      ...keepSections,
     ])
-    const sections = assembled.sections.filter(section => keep.has(section?.name) || String(section?.name || "").startsWith("dsh-purge") || String(section?.name || "").startsWith("dshpg-"))
+    const availableNames = new Set(assembled.sections.map(section => section?.name))
+    for (const sectionName of keepSections) {
+      if (availableNames.has(sectionName) || warnedKeepSections.has(sectionName)) continue
+      warnedKeepSections.add(sectionName)
+      try {
+        ctx.logger?.warn?.(`${name}: keepSections entry ${JSON.stringify(sectionName)} never matched any assembled section`)
+      } catch {
+        // Logger unavailable
+      }
+    }
+    const sections = assembled.sections.filter(section => keep.has(section?.name)
+      || section?.name?.startsWith('dsh-purge') || section?.name?.startsWith('dshpg-'))
     if (sections.length === 0) {
       warnOnce(`${name}: no section matched ${JSON.stringify([...keep])} — `
         + 'keeping the assembled prompt instead of sending an empty one')
@@ -852,8 +887,15 @@ export function apply(ctx, config) {
     }
   }, { prepend: true })
 
-  // 2. Synchronous tool result tracking (no fake emit, no async work in emit listener)
+  // 2. Synchronous tool result tracking (no fake emit, no async work in emit listener).
+  //
+  // Tracking exists for the dynamic subdirectory discovery of system-prompt mode,
+  // so the other two modes return before touching the session at all: host mode
+  // hands the channel to the harness's own row, and hint mode never reads the log.
+  // The listener stays registered in every mode, because the hook surface is part
+  // of this preset's contract whatever a mode does with it.
   ctx.on('tools/result', (exec, result) => {
+    if (instructionSource !== 'system-prompt') return
     if (result?.isError || !exec?.agent || exec?.signal?.aborted) return
     const path = filePathFromExecution(exec)
     if (!path) return
@@ -873,18 +915,20 @@ export function apply(ctx, config) {
 
     const agent = payload?.agent
     const session = agent?.session
+
+    // Host mode: the harness's agent-instructions row owns the channel, so every
+    // message it queued — baseline and dynamic alike — passes through verbatim:
+    // no filterInstructionMessages, no dynamic subdirectory discovery, no
+    // plugin-authored message, and no per-session state to build. Handing the
+    // decision back unchanged is the point.
+    if (instructionSource === 'host') return decision
+
     const state = session ? getSessionState(session) : undefined
 
     if (instructionSource === 'hint') {
       if (session === undefined) return decision
       return { ...decision, messages: instructionHintMessages(decision.messages, state) }
     }
-
-    // Host mode: the harness's agent-instructions row owns the channel, so every
-    // message it queued — baseline and dynamic alike — passes through verbatim:
-    // no filterInstructionMessages, no dynamic subdirectory discovery, no
-    // plugin-authored message. Handing the decision back unchanged is the point.
-    if (instructionSource === 'host') return decision
 
     // System-prompt mode:
     const cwd = session?.header?.cwd
@@ -921,8 +965,12 @@ export function apply(ctx, config) {
   }, { prepend: true })
 
   // 4. Session lifecycle / compaction recovery
+  //
+  // Host mode writes no per-session state (the harness's own row owns the
+  // channel), so it has nothing to reset and the map is never consulted there.
   ctx.on('session/event', (session, event) => {
     if (event?.type === 'compaction/end') {
+      if (instructionSource === 'host') return
       const state = sessionStateMap.get(session)
       if (state) {
         state.hinted = false

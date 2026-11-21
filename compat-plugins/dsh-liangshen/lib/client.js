@@ -352,6 +352,14 @@ window.__ModuleLoader__.load({
 			/** Ceiling on one in-flight switch, so a lost Remote answer cannot hang the row. */
 			selectTimeoutMs;
 			disposers = [];
+			/** The one face this controller hands out: the view reads it on every render. */
+			cachedFace;
+			/**
+			* The translator bound to this plugin's locale namespace, resolved on first
+			* use. A lookup that resolved nothing is never cached, so a locale service
+			* registered after activation still reaches the same face.
+			*/
+			cachedTranslate;
 			constructor(ctx, options = {}) {
 				this.ctx = ctx;
 				this.selectTimeoutMs = options.selectTimeoutMs ?? 1e4;
@@ -385,9 +393,11 @@ window.__ModuleLoader__.load({
 			dispose() {
 				for (const dispose of this.disposers.splice(0)) dispose();
 			}
-			/** The inject face handed to the slot entry. */
+			/** The inject face handed to the slot entry; the same instance on every read. */
 			face() {
-				return {
+				const cached = this.cachedFace;
+				if (cached !== void 0) return cached;
+				const face = {
 					store: this.store,
 					pull: () => {
 						this.toggle("down");
@@ -396,10 +406,25 @@ window.__ModuleLoader__.load({
 						this.toggle("up");
 					},
 					t: (key, vars) => {
-						const translate = readService(() => this.ctx.locale.bind("liangshen"));
+						const translate = this.translate();
 						return translate === void 0 ? key : translate(key, vars);
 					}
 				};
+				this.cachedFace = face;
+				return face;
+			}
+			/**
+			* The translator bound to this plugin's locale namespace, or undefined while
+			* none answers. The binding is resolved once and only on success: a locale
+			* service that arrives later than this controller still gets its chance.
+			*/
+			translate() {
+				const cached = this.cachedTranslate;
+				if (cached !== void 0) return cached;
+				const bound = readService(() => this.ctx.locale.bind("liangshen"));
+				if (typeof bound !== "function") return void 0;
+				this.cachedTranslate = bound;
+				return bound;
 			}
 			/** Read the roster; a refusal leaves the lever as it was. */
 			async load() {
@@ -424,14 +449,18 @@ window.__ModuleLoader__.load({
 				const facts = this.facts();
 				const snapshot = this.store.getSnapshot();
 				const state = leverState(facts);
-				const target = restoreTarget(facts);
-				const restoreLabel = target === void 0 ? "" : this.labelOf(target);
+				const restoreLabel = facts.blank ? this.restoreLabelOf(facts) : "";
 				if (snapshot.state === state && snapshot.restoreLabel === restoreLabel) return;
 				this.store.set({
 					...snapshot,
 					state,
 					restoreLabel
 				});
+			}
+			/** Display name of the preset a push-up would restore; empty when there is none. */
+			restoreLabelOf(facts) {
+				const target = restoreTarget(facts);
+				return target === void 0 ? "" : this.labelOf(target);
 			}
 			/** The verb behind one gesture direction. */
 			async toggle(direction) {
@@ -519,20 +548,34 @@ window.__ModuleLoader__.load({
 					if (typeof sessionStorage !== "undefined") sessionStorage.setItem("dsh-liangshen:previous-preset", presetId);
 				} catch {}
 			}
-			/** The facts one decision reads, from the live session and the roster. */
+			/**
+			* The facts one decision reads, from the live session and the roster.
+			*
+			* `previous` is resolved only for a blank session: it exists to name the
+			* preset a push-up restores, and only a blank session may switch preset at
+			* all. Resolving it costs a DOM chip lookup and a session-storage read
+			* ({@link detectPreset}), which a started session -- reported as 'locked' or
+			* 'missing' -- would pay for on every roster and session update and never use.
+			*/
 			facts() {
 				const summary = this.currentSession();
 				const available = this.rows.filter((row) => row.broken === void 0).map((row) => row.id);
 				const fallback = this.rows.find((row) => row.isDefault)?.id;
 				const currentPreset = presetOf(summary);
+				const blank = summary?.blank === true;
+				if (!blank) return {
+					blank,
+					agentPreset: currentPreset,
+					available,
+					fallback
+				};
 				if (currentPreset !== void 0 && currentPreset !== "liangshen") this.rememberPrevious(currentPreset);
-				const previous = this.previous ?? this.detectPreset();
 				return {
-					blank: summary?.blank === true,
+					blank,
 					agentPreset: currentPreset,
 					available,
 					fallback,
-					previous
+					previous: this.previous ?? this.detectPreset()
 				};
 			}
 			currentSessionId() {
@@ -639,7 +682,7 @@ window.__ModuleLoader__.load({
 		}
 		//#endregion
 		//#region \0dsh-css:packages/dsh-liangshen/src/client/settings-card.module.css.mjs
-		const css = "._9t79wq_card{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:12px;list-style:none;transition:border-color .16s,background .16s}._9t79wq_card:hover{border-color:var(--dsw-alias-label-dimmed)}._9t79wq_cardOpen{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-label-dimmed)}._9t79wq_header{appearance:none;box-sizing:border-box;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;background:0 0;border:0;border-radius:12px;align-items:center;gap:13px;padding:16px;display:flex}._9t79wq_header:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}._9t79wq_headerStatic{box-sizing:border-box;border-radius:12px;align-items:center;gap:13px;width:100%;padding:16px;display:flex}._9t79wq_headText{flex-direction:column;flex:1;gap:4px;min-width:0;display:flex}._9t79wq_mark{background:var(--dsw-alias-bg-module-platform);width:34px;height:34px;color:var(--dsw-alias-label-secondary);border-radius:10px;flex:none;place-items:center;transition:color .16s;display:grid}._9t79wq_header:hover ._9t79wq_mark,._9t79wq_cardOpen ._9t79wq_mark{color:var(--dsw-alias-label-primary)}._9t79wq_name{color:var(--dsw-alias-label-primary);font-size:15px;font-weight:600;line-height:1.4}._9t79wq_description{color:var(--dsw-alias-label-secondary);font-size:13px;line-height:1.5}._9t79wq_pending{white-space:nowrap;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary);border-radius:999px;flex:none;padding:1px 8px;font-size:11px;font-weight:500;line-height:17px}._9t79wq_headerAction{flex:none;align-items:center;display:inline-flex}._9t79wq_chevron{color:var(--dsw-alias-label-tertiary);flex:none;width:16px;height:16px;transition:transform .16s,color .16s}._9t79wq_header:hover ._9t79wq_chevron{color:var(--dsw-alias-label-secondary)}._9t79wq_chevronOpen{transform:rotate(180deg)}._9t79wq_body{border-top:1px solid var(--dsw-alias-border-l2);margin:0 16px;padding-bottom:8px}._9t79wq_readOnly{color:var(--dsw-alias-label-secondary);margin:12px 0 0;font-size:12px;line-height:1.5}._9t79wq_notExposed{color:var(--dsw-alias-state-warn-primary);margin:12px 0 0;font-size:12px;line-height:1.5}._9t79wq_footer{border-top:1px solid var(--dsw-alias-border-l2);justify-content:flex-end;align-items:center;gap:8px;padding:12px 0 4px;display:flex}._9t79wq_failed{min-width:0;color:var(--dsw-alias-state-error-primary,#b42318);text-overflow:ellipsis;white-space:nowrap;flex:1;margin:0;font-size:12px;line-height:1.5;overflow:hidden}._9t79wq_discard,._9t79wq_save{appearance:none;font:inherit;cursor:pointer;border:1px solid #0000;border-radius:8px;padding:5px 14px;font-size:13px;line-height:1.5}._9t79wq_discard{border-color:var(--dsw-alias-border-l2);color:var(--dsw-alias-label-secondary);background:0 0}._9t79wq_discard:hover:not(:disabled){color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-label-dimmed)}._9t79wq_save{background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-layer-3)}._9t79wq_discard:disabled,._9t79wq_save:disabled{opacity:.4;cursor:default}._9t79wq_discard:focus-visible,._9t79wq_save:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}._9t79wq_field{flex-direction:column;gap:6px;padding:12px 0;display:flex}._9t79wq_field+._9t79wq_field{border-top:1px solid var(--dsw-alias-border-l2)}._9t79wq_head{align-items:center;gap:8px;display:flex}._9t79wq_label{min-width:0;color:var(--dsw-alias-label-primary);flex:1;font-size:13px;font-weight:500;line-height:1.5}._9t79wq_badges{align-items:center;gap:8px;display:inline-flex}._9t79wq_badge{white-space:nowrap;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary);border-radius:999px;padding:1px 8px;font-size:11px;font-weight:500;line-height:17px}._9t79wq_reset{font:inherit;color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;padding:0;font-size:12px;line-height:1.5}._9t79wq_reset:hover:not(:disabled){color:var(--dsw-alias-label-primary)}._9t79wq_reset:disabled{cursor:default}._9t79wq_reset:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px;outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}._9t79wq_input,._9t79wq_select{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);height:34px;font:inherit;color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5}._9t79wq_input:focus-visible,._9t79wq_select:focus-visible{border-color:var(--dsw-alias-brand-primary);outline:none}._9t79wq_input:disabled,._9t79wq_select:disabled{color:var(--dsw-alias-label-tertiary);cursor:default}._9t79wq_inputInvalid{border:1px solid var(--dsw-alias-state-error-primary,#b42318);background:var(--dsw-alias-bg-layer-3);height:34px;font:inherit;color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5}._9t79wq_inputInvalid:focus-visible{outline:2px solid var(--dsw-alias-state-error-primary,#b42318);outline-offset:1px;border-color:var(--dsw-alias-state-error-primary,#b42318)}._9t79wq_selectWrap{position:relative}._9t79wq_selectButton{appearance:none;text-align:left;cursor:pointer;justify-content:space-between;align-items:center;gap:8px;width:100%;display:flex}._9t79wq_selectLabel{text-overflow:ellipsis;white-space:nowrap;min-width:0;overflow:hidden}._9t79wq_selectChevron{color:var(--dsw-alias-label-tertiary);flex:none;transition:transform .16s}._9t79wq_selectChevronOpen{transform:rotate(180deg)}._9t79wq_selectPopup{z-index:40;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);max-height:240px;box-shadow:0 8px 24px var(--dsw-alias-bg-mask-2);opacity:0;border-radius:8px;flex-direction:column;padding:4px;transition:opacity .1s,transform .1s;display:flex;position:absolute;top:calc(100% + 4px);left:0;right:0;overflow-y:auto;transform:translateY(-4px)}._9t79wq_selectPopupOpen{opacity:1;transform:none}._9t79wq_selectPopupClose{opacity:0;pointer-events:none;transform:translateY(-4px)}._9t79wq_selectOption{color:var(--dsw-alias-label-primary);cursor:pointer;white-space:nowrap;text-overflow:ellipsis;border-radius:6px;flex-shrink:0;padding:6px 10px;font-size:13px;line-height:1.5;overflow:hidden}._9t79wq_selectOption:hover,._9t79wq_selectOptionActive{background:var(--dsw-alias-interactive-bg-hover)}._9t79wq_selectOptionSelected{color:var(--dsw-alias-brand-primary);background:color-mix(in srgb, var(--dsw-alias-brand-primary-new-colorprimary-new-color) 10%, transparent);font-weight:500}._9t79wq_invalid{color:var(--dsw-alias-state-error-primary,#b42318);margin:0;font-size:12px;line-height:1.5}._9t79wq_hint{color:var(--dsw-alias-label-secondary);margin:0;font-size:12px;line-height:1.5}._9t79wq_toggle{appearance:none;cursor:pointer;font:inherit;background:0 0;border:0;border-radius:999px;align-items:center;margin:0;padding:0;display:inline-flex}._9t79wq_toggleTrack{background:var(--dsw-alias-label-dimmed);border-radius:999px;flex:none;width:30px;height:16px;transition:background .18s;position:relative}._9t79wq_toggleThumb{background:var(--dsw-alias-bg-layer-3);border-radius:50%;width:12px;height:12px;transition:left .18s;position:absolute;top:2px;left:2px}._9t79wq_toggle[aria-checked=true] ._9t79wq_toggleTrack{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-label-primary))}._9t79wq_toggle[aria-checked=true] ._9t79wq_toggleThumb{background:var(--dsw-alias-label-primary-foreground,var(--dsw-alias-bg-layer-3));left:16px}._9t79wq_toggle:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}._9t79wq_toggle:disabled{opacity:.45;cursor:default}@media (prefers-reduced-motion:reduce){._9t79wq_card,._9t79wq_header,._9t79wq_mark,._9t79wq_chevron,._9t79wq_chevronOpen,._9t79wq_discard,._9t79wq_save,._9t79wq_selectChevron,._9t79wq_selectChevronOpen,._9t79wq_selectPopup,._9t79wq_toggleTrack,._9t79wq_toggleThumb{transition:none}}";
+		const css = "._9t79wq_card{--settings-card-radius:12px;--settings-card-header-pad:16px;--settings-card-header-gap:13px;--settings-card-title-size:15px;--settings-card-description-size:13px;--settings-card-body-inset:16px;--settings-card-motion:.18s;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:var(--settings-card-radius);list-style:none;transition:border-color .16s,background .16s}._9t79wq_card:hover{border-color:var(--dsw-alias-label-dimmed)}._9t79wq_cardOpen{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-label-dimmed)}._9t79wq_cardNested{--settings-card-radius:10px;--settings-card-header-pad:10px 12px;--settings-card-header-gap:10px;--settings-card-title-size:13px;--settings-card-description-size:12px;--settings-card-body-inset:12px}._9t79wq_cardNested ._9t79wq_description{white-space:nowrap;text-overflow:ellipsis;overflow:hidden}._9t79wq_header{appearance:none;box-sizing:border-box;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;border-radius:var(--settings-card-radius);align-items:center;gap:var(--settings-card-header-gap);padding:var(--settings-card-header-pad);background:0 0;border:0;display:flex}._9t79wq_header:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}._9t79wq_headerStatic{box-sizing:border-box;border-radius:var(--settings-card-radius);align-items:center;gap:var(--settings-card-header-gap);width:100%;padding:var(--settings-card-header-pad);display:flex}._9t79wq_headText{flex-direction:column;flex:1;gap:4px;min-width:0;display:flex}._9t79wq_mark{background:var(--dsw-alias-bg-module-platform);width:34px;height:34px;color:var(--dsw-alias-label-secondary);border-radius:10px;flex:none;place-items:center;transition:color .16s;display:grid}._9t79wq_header:hover ._9t79wq_mark,._9t79wq_cardOpen ._9t79wq_mark{color:var(--dsw-alias-label-primary)}._9t79wq_name{color:var(--dsw-alias-label-primary);font-size:var(--settings-card-title-size);font-weight:600;line-height:1.4}._9t79wq_description{color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}._9t79wq_headerAction{flex:none;align-items:center;display:inline-flex}._9t79wq_chevron{color:var(--dsw-alias-label-tertiary);flex:none;width:16px;height:16px;transition:transform .16s,color .16s}._9t79wq_header:hover ._9t79wq_chevron{color:var(--dsw-alias-label-secondary)}._9t79wq_chevronOpen{transform:rotate(180deg)}._9t79wq_disclosure{opacity:0;transition:grid-template-rows var(--settings-card-motion) ease, opacity var(--settings-card-motion) ease;grid-template-rows:0fr;display:grid}._9t79wq_disclosure[data-state=collapsed],._9t79wq_disclosure[data-state=entering],._9t79wq_disclosure[data-state=closing]{overflow:hidden}._9t79wq_disclosure[data-state=entering],._9t79wq_disclosure[data-state=shown]{opacity:1;grid-template-rows:1fr}._9t79wq_disclosure>._9t79wq_body{min-height:0}._9t79wq_body{border-top:1px solid var(--dsw-alias-border-l2);margin:0 var(--settings-card-body-inset);padding-bottom:8px;container:_9t79wq_settings-card/inline-size}._9t79wq_readOnly{color:var(--dsw-alias-label-secondary);margin:12px 0 0;font-size:12px;line-height:1.5}._9t79wq_notExposed{color:var(--dsw-alias-state-warn-primary);margin:12px 0 0;font-size:12px;line-height:1.5}._9t79wq_failed{color:var(--dsw-alias-state-error-primary,#b42318);overflow-wrap:anywhere;margin:8px 0 4px;font-size:12px;line-height:18px}._9t79wq_field{grid-template-columns:minmax(0,1fr) fit-content(50%);grid-template-areas:\"_9t79wq_head _9t79wq_control\"\"_9t79wq_hint _9t79wq_control\";align-items:center;gap:4px 24px;padding:16px 0;display:grid}._9t79wq_field>._9t79wq_head{grid-area:_9t79wq_head}._9t79wq_field>:is(._9t79wq_hint,._9t79wq_invalid){grid-area:_9t79wq_hint}._9t79wq_field>:not(._9t79wq_head,._9t79wq_hint,._9t79wq_invalid){grid-area:_9t79wq_control;justify-self:end;max-width:100%}._9t79wq_field+._9t79wq_field{border-top:1px solid var(--dsw-alias-border-l2)}._9t79wq_head{align-items:center;gap:8px;display:flex}._9t79wq_label{min-width:0;color:var(--dsw-alias-label-primary);flex:1;font-size:14px;font-weight:400;line-height:22px}._9t79wq_badges{align-items:center;gap:8px;display:inline-flex}._9t79wq_badge{white-space:nowrap;background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary);border-radius:999px;padding:1px 8px;font-size:11px;font-weight:500;line-height:17px}._9t79wq_reset{font:inherit;color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;padding:0;font-size:12px;line-height:1.5}._9t79wq_reset:hover:not(:disabled){color:var(--dsw-alias-label-primary)}._9t79wq_reset:disabled{cursor:default}._9t79wq_reset:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}._9t79wq_segmentGroup{background:color-mix(in srgb, var(--dsw-alias-label-primary) 7%, transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);border-radius:8px;flex-wrap:wrap;align-items:center;gap:2px;padding:2px;display:inline-flex;position:relative}._9t79wq_segment{appearance:none;color:var(--dsw-alias-label-secondary);font:inherit;white-space:nowrap;cursor:pointer;background:0 0;border:0;border-radius:7px;margin:0;padding:3px 12px;font-size:13px;font-weight:500;line-height:18px;transition:background-color .12s,color .12s}._9t79wq_segment:hover:not(:disabled):not([data-active]){color:var(--dsw-alias-label-primary)}._9t79wq_segmentGroup:not([data-pill])>._9t79wq_segment[data-active],._9t79wq_segmentGroup[data-pill]:before{background:var(--dsw-alias-bg-overlay,var(--dsw-alias-bg-layer-3));box-shadow:0 1px 2px #14141314}body[data-ds-dark-theme] ._9t79wq_segmentGroup:not([data-pill])>._9t79wq_segment[data-active],body[data-ds-dark-theme] ._9t79wq_segmentGroup[data-pill]:before{box-shadow:none;background:#ffffff24}._9t79wq_segment[data-active]{color:var(--dsw-alias-label-primary)}._9t79wq_segmentGroup[data-pill]:before{content:\"\";width:var(--segment-pill-w,0px);height:var(--segment-pill-h,0px);transform:translate(var(--segment-pill-x,0px), var(--segment-pill-y,0px));pointer-events:none;border-radius:7px;transition:transform .24s cubic-bezier(.22,.61,.36,1),width .24s cubic-bezier(.22,.61,.36,1),height .24s cubic-bezier(.22,.61,.36,1);position:absolute;top:0;left:0}._9t79wq_segmentGroup>*{z-index:1;position:relative}._9t79wq_segment:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}._9t79wq_segment:disabled{cursor:not-allowed;opacity:.45}._9t79wq_segmentGroup[data-pill]:has(>._9t79wq_segment:disabled):before{opacity:.45}._9t79wq_input,._9t79wq_select{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);height:34px;font:inherit;color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5}._9t79wq_input:focus-visible,._9t79wq_select:focus-visible{border-color:var(--dsw-alias-brand-primary);outline:none}._9t79wq_input:disabled,._9t79wq_select:disabled{color:var(--dsw-alias-label-tertiary);cursor:default}._9t79wq_inputInvalid{border:1px solid var(--dsw-alias-state-error-primary,#b42318);background:var(--dsw-alias-bg-layer-3);height:34px;font:inherit;color:var(--dsw-alias-label-primary);border-radius:8px;padding:0 12px;font-size:13px;line-height:1.5}._9t79wq_inputInvalid:focus-visible{outline:2px solid var(--dsw-alias-state-error-primary,#b42318);outline-offset:1px;border-color:var(--dsw-alias-state-error-primary,#b42318)}._9t79wq_field>:is(._9t79wq_input,._9t79wq_inputInvalid,._9t79wq_select,._9t79wq_selectWrap,._9t79wq_rangeAnchor){box-sizing:border-box;width:220px}._9t79wq_rangeAnchor>:is(._9t79wq_input,._9t79wq_inputInvalid){box-sizing:border-box;width:100%}@container _9t79wq_settings-card (width<=440px){._9t79wq_field{grid-template-columns:minmax(0,1fr);grid-template-areas:\"_9t79wq_head\"\"_9t79wq_hint\"\"_9t79wq_control\";row-gap:8px}._9t79wq_field>:not(._9t79wq_head,._9t79wq_hint,._9t79wq_invalid){justify-self:start}._9t79wq_field>:is(._9t79wq_input,._9t79wq_inputInvalid,._9t79wq_select,._9t79wq_selectWrap,._9t79wq_rangeAnchor){justify-self:stretch;width:auto}}._9t79wq_selectWrap{position:relative}._9t79wq_selectButton{appearance:none;text-align:left;cursor:pointer;justify-content:space-between;align-items:center;gap:8px;width:100%;display:flex}._9t79wq_selectLabel{text-overflow:ellipsis;white-space:nowrap;min-width:0;overflow:hidden}._9t79wq_selectChevron{color:var(--dsw-alias-label-tertiary);flex:none;transition:transform .16s}._9t79wq_selectChevronOpen{transform:rotate(180deg)}._9t79wq_selectPopup{z-index:40;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);max-height:240px;box-shadow:0 8px 24px var(--dsw-alias-bg-mask-2);opacity:0;border-radius:8px;flex-direction:column;padding:4px;transition:opacity .1s,transform .1s;display:flex;position:absolute;top:calc(100% + 4px);left:0;right:0;overflow-y:auto;transform:translateY(-4px)}._9t79wq_selectPopupOpen{opacity:1;transform:none}._9t79wq_selectPopupClose{opacity:0;pointer-events:none;transform:translateY(-4px)}._9t79wq_rangeAnchor{display:inline-flex;position:relative}._9t79wq_rangeBubble{z-index:40;box-sizing:border-box;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);width:220px;box-shadow:0 8px 24px var(--dsw-alias-bg-mask-2);opacity:0;visibility:hidden;border-radius:10px;padding:10px 12px 6px;transition:opacity .12s,transform .12s,visibility 0s linear .12s;position:absolute;right:0}._9t79wq_rangeBubble[data-side=above]{bottom:calc(100% + 6px);transform:translateY(4px)}._9t79wq_rangeBubble[data-side=below]{top:calc(100% + 6px);transform:translateY(-4px)}._9t79wq_rangeBubble[data-open]{opacity:1;visibility:visible;transition:opacity .12s,transform .12s,visibility;transform:none}._9t79wq_rangeSlider{appearance:none;cursor:pointer;background:0 0;width:100%;height:18px;margin:0;display:block}._9t79wq_rangeSlider::-webkit-slider-runnable-track{background:linear-gradient(to right, var(--dsw-alias-brand-primary) var(--range-fill,0%), color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent) var(--range-fill,0%));border-radius:999px;height:4px}._9t79wq_rangeSlider::-moz-range-track{background:color-mix(in srgb, var(--dsw-alias-label-primary) 12%, transparent);border-radius:999px;height:4px}._9t79wq_rangeSlider::-moz-range-progress{background:var(--dsw-alias-brand-primary);border-radius:999px;height:4px}._9t79wq_rangeSlider::-webkit-slider-thumb{appearance:none;background:#fff;border:0;border-radius:50%;width:14px;height:14px;margin-top:-5px;transition:transform .12s;box-shadow:0 0 0 1px #0000001f,0 1px 3px #00000040}._9t79wq_rangeSlider::-moz-range-thumb{background:#fff;border:0;border-radius:50%;width:14px;height:14px;box-shadow:0 0 0 1px #0000001f,0 1px 3px #00000040}._9t79wq_rangeSlider:active::-webkit-slider-thumb{transform:scale(1.15)}._9t79wq_rangeSlider:focus-visible{outline:none}._9t79wq_rangeSlider:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 2px var(--dsw-alias-brand-primary)}._9t79wq_rangeSlider:disabled{cursor:not-allowed}._9t79wq_rangeEnds{color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;justify-content:space-between;margin-top:2px;font-size:11px;line-height:16px;display:flex}._9t79wq_selectOption{color:var(--dsw-alias-label-primary);cursor:pointer;white-space:nowrap;text-overflow:ellipsis;border-radius:6px;flex-shrink:0;padding:6px 10px;font-size:13px;line-height:1.5;overflow:hidden}._9t79wq_selectOption:hover,._9t79wq_selectOptionActive{background:var(--dsw-alias-interactive-bg-hover)}._9t79wq_selectOptionSelected{color:var(--dsw-alias-brand-primary);background:color-mix(in srgb, var(--dsw-alias-brand-primary) 10%, transparent);font-weight:500}._9t79wq_invalid{color:var(--dsw-alias-state-error-primary,#b42318);margin:0;font-size:12px;line-height:18px}._9t79wq_hint{color:var(--dsw-alias-label-secondary);margin:0;font-size:12px;line-height:18px}._9t79wq_toggle{appearance:none;cursor:pointer;font:inherit;background:0 0;border:0;border-radius:999px;align-items:center;margin:0;padding:0;display:inline-flex}._9t79wq_toggleTrack{background:var(--dsw-alias-label-dimmed);border-radius:999px;flex:none;width:36px;height:20px;transition:background-color .18s;position:relative}._9t79wq_toggleThumb{--toggle-travel:16px;--toggle-overshoot:1px;background:var(--dsw-alias-bg-layer-3);border-radius:50%;width:16px;height:16px;transition:translate .18s;position:absolute;top:2px;left:2px;translate:0;box-shadow:0 1px 2px #1414132e}._9t79wq_toggle[aria-checked=true] ._9t79wq_toggleTrack{background:var(--dsw-alias-button-primary-fill,var(--dsw-alias-label-primary))}._9t79wq_toggle[aria-checked=true] ._9t79wq_toggleThumb{translate:var(--toggle-travel) 0;background:var(--dsw-alias-label-primary-foreground,var(--dsw-alias-bg-layer-3))}._9t79wq_toggle[data-moved][aria-checked=true] ._9t79wq_toggleThumb{animation:.35s cubic-bezier(.34,1.45,.64,1) both _9t79wq_toggle-on}._9t79wq_toggle[data-moved][aria-checked=false] ._9t79wq_toggleThumb{animation:.35s cubic-bezier(.34,1.45,.64,1) both _9t79wq_toggle-off}@keyframes _9t79wq_toggle-on{0%{translate:0}55%{translate:calc(var(--toggle-travel) + var(--toggle-overshoot)) 0}80%,to{translate:var(--toggle-travel) 0}}@keyframes _9t79wq_toggle-off{0%{translate:var(--toggle-travel) 0}55%{translate:calc(0px - var(--toggle-overshoot)) 0}80%,to{translate:0}}._9t79wq_toggle:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}._9t79wq_toggle:disabled{opacity:.45;cursor:not-allowed}@media (prefers-reduced-motion:reduce){._9t79wq_card,._9t79wq_header,._9t79wq_mark,._9t79wq_chevron,._9t79wq_chevronOpen,._9t79wq_rangeBubble,._9t79wq_selectChevron,._9t79wq_selectChevronOpen,._9t79wq_selectPopup,._9t79wq_toggleTrack,._9t79wq_toggleThumb{transition:none}._9t79wq_toggle[data-moved] ._9t79wq_toggleThumb{animation:none}._9t79wq_disclosure{transition-property:opacity}}";
 		const tagId = "@linxin666/dsh-liangshen/packages/dsh-liangshen/src/client/settings-card.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -653,14 +696,15 @@ window.__ModuleLoader__.load({
 			"badges": "_9t79wq_badges",
 			"body": "_9t79wq_body",
 			"card": "_9t79wq_card",
+			"cardNested": "_9t79wq_cardNested",
 			"cardOpen": "_9t79wq_cardOpen",
 			"chevron": "_9t79wq_chevron",
 			"chevronOpen": "_9t79wq_chevronOpen",
+			"control": "_9t79wq_control",
 			"description": "_9t79wq_description",
-			"discard": "_9t79wq_discard",
+			"disclosure": "_9t79wq_disclosure",
 			"failed": "_9t79wq_failed",
 			"field": "_9t79wq_field",
-			"footer": "_9t79wq_footer",
 			"head": "_9t79wq_head",
 			"headText": "_9t79wq_headText",
 			"header": "_9t79wq_header",
@@ -674,10 +718,14 @@ window.__ModuleLoader__.load({
 			"mark": "_9t79wq_mark",
 			"name": "_9t79wq_name",
 			"notExposed": "_9t79wq_notExposed",
-			"pending": "_9t79wq_pending",
+			"rangeAnchor": "_9t79wq_rangeAnchor",
+			"rangeBubble": "_9t79wq_rangeBubble",
+			"rangeEnds": "_9t79wq_rangeEnds",
+			"rangeSlider": "_9t79wq_rangeSlider",
 			"readOnly": "_9t79wq_readOnly",
 			"reset": "_9t79wq_reset",
-			"save": "_9t79wq_save",
+			"segment": "_9t79wq_segment",
+			"segmentGroup": "_9t79wq_segmentGroup",
 			"select": "_9t79wq_select",
 			"selectButton": "_9t79wq_selectButton",
 			"selectChevron": "_9t79wq_selectChevron",
@@ -690,20 +738,274 @@ window.__ModuleLoader__.load({
 			"selectPopupClose": "_9t79wq_selectPopupClose",
 			"selectPopupOpen": "_9t79wq_selectPopupOpen",
 			"selectWrap": "_9t79wq_selectWrap",
+			"settings-card": "_9t79wq_settings-card",
 			"toggle": "_9t79wq_toggle",
+			"toggle-off": "_9t79wq_toggle-off",
+			"toggle-on": "_9t79wq_toggle-on",
 			"toggleThumb": "_9t79wq_toggleThumb",
 			"toggleTrack": "_9t79wq_toggleTrack"
 		};
 		//#endregion
+		//#region src/client/RangeBubble.tsx
+		/**
+		* Coarse adjustment for a bounded number: resting the pointer on the control
+		* (or moving focus into it) raises a small bubble holding a slider across the
+		* field's whole range, so a large change is one drag instead of many presses
+		* or a retyped value. The control itself stays the precise entry.
+		*
+		* The bubble belongs to the anchor's subtree, so moving from the control onto
+		* the bubble never counts as leaving. It opens after a short rest and closes a
+		* moment after the pointer and focus have both gone, so crossing the control
+		* on the way elsewhere does not flash it. While a drag is in progress the
+		* bubble stays put even if the pointer strays off it.
+		*
+		* Dragging reports each value through `onInput`, so the field shows it live;
+		* releasing the thumb, or a key press on it, reports `onCommit` once. The
+		* bubble opens on the side of the control that has room inside the nearest
+		* scrolling ancestor, so a row near the top of a settings page does not hang
+		* its bubble under the page edge.
+		*/
+		/** Rest on the control before the bubble opens. */
+		const OPEN_DELAY_MS = 220;
+		/** Grace after pointer and focus have left before the bubble closes. */
+		const CLOSE_DELAY_MS = 200;
+		/** Room the bubble needs between the control and the scroller's edge. */
+		const BUBBLE_ROOM_PX = 64;
+		/** The nearest ancestor that scrolls vertically, or the viewport's root. */
+		function scroller(node) {
+			for (let parent = node.parentElement; parent !== null; parent = parent.parentElement) {
+				const overflow = getComputedStyle(parent).overflowY;
+				if (overflow === "auto" || overflow === "scroll") return parent;
+			}
+			return node.ownerDocument.documentElement;
+		}
+		/**
+		* Render the control with its coarse-adjustment bubble.
+		* @param props - the range, the value and the two report callbacks.
+		* @returns the anchor holding the control and the bubble.
+		*/
+		function RangeBubble(props) {
+			const { min, max, step, disabled = false } = props;
+			const [open, setOpen] = (0, react.useState)(false);
+			const [side, setSide] = (0, react.useState)("above");
+			const [live, setLive] = (0, react.useState)(null);
+			const anchorRef = (0, react.useRef)(null);
+			const timer = (0, react.useRef)(void 0);
+			const hovered = (0, react.useRef)(false);
+			const focused = (0, react.useRef)(false);
+			const dragging = (0, react.useRef)(false);
+			(0, react.useEffect)(() => () => {
+				clearTimeout(timer.current);
+			}, []);
+			(0, react.useEffect)(() => {
+				if (disabled) {
+					clearTimeout(timer.current);
+					setOpen(false);
+				}
+			}, [disabled]);
+			const show = () => {
+				const anchor = anchorRef.current;
+				if (anchor !== null) {
+					const room = anchor.getBoundingClientRect().top - scroller(anchor).getBoundingClientRect().top;
+					setSide(room >= BUBBLE_ROOM_PX ? "above" : "below");
+				}
+				setOpen(true);
+			};
+			const schedule = () => {
+				clearTimeout(timer.current);
+				if (disabled) return;
+				if (hovered.current || focused.current || dragging.current) {
+					if (!open) timer.current = setTimeout(show, focused.current ? 0 : OPEN_DELAY_MS);
+					return;
+				}
+				timer.current = setTimeout(() => {
+					setOpen(false);
+				}, CLOSE_DELAY_MS);
+			};
+			const commit = (value) => {
+				dragging.current = false;
+				setLive(null);
+				props.onCommit(value);
+				schedule();
+			};
+			const onChange = (event) => {
+				const value = Number(event.target.value);
+				setLive(value);
+				props.onInput(value);
+			};
+			const onKeyUp = (event) => {
+				if (live !== null) commit(live);
+				if (event.key === "Escape") {
+					clearTimeout(timer.current);
+					setOpen(false);
+				}
+			};
+			const shown = live ?? Math.min(max, Math.max(min, props.value));
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				ref: anchorRef,
+				className: settings_card_module_css_default.rangeAnchor,
+				onPointerEnter: () => {
+					hovered.current = true;
+					schedule();
+				},
+				onPointerLeave: () => {
+					hovered.current = false;
+					schedule();
+				},
+				onFocus: () => {
+					focused.current = true;
+					schedule();
+				},
+				onBlur: (event) => {
+					if (event.currentTarget.contains(event.relatedTarget)) return;
+					focused.current = false;
+					if (live !== null) commit(live);
+					else schedule();
+				},
+				children: [props.children, /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: settings_card_module_css_default.rangeBubble,
+					"data-open": open ? "" : void 0,
+					"data-side": side,
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+						type: "range",
+						className: settings_card_module_css_default.rangeSlider,
+						min,
+						max,
+						step,
+						value: shown,
+						"aria-label": props.label,
+						tabIndex: open ? 0 : -1,
+						disabled,
+						style: { "--range-fill": `${(shown - min) / (max - min) * 100}%` },
+						onPointerDown: () => {
+							dragging.current = true;
+						},
+						onPointerUp: (event) => {
+							commit(Number(event.currentTarget.value));
+						},
+						onPointerCancel: (event) => {
+							commit(Number(event.currentTarget.value));
+						},
+						onChange,
+						onKeyUp
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: settings_card_module_css_default.rangeEnds,
+						"aria-hidden": "true",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: min }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: max })]
+					})]
+				})]
+			});
+		}
+		//#endregion
+		//#region src/client/SegmentGroup.tsx
+		/**
+		* The family's segmented control: a quiet track whose options share one
+		* highlight that slides to the pressed option, instead of each option fading
+		* its own background out and the next one in. The settings fields' small
+		* choices and the Web Extensions TAB strip both render through it, so the two
+		* read as one control.
+		*
+		* The caller builds the option buttons and marks the pressed one with
+		* `data-active`; the group measures that button after every render and writes
+		* its box as four custom properties, and the stylesheet draws the highlight
+		* there (`.segmentGroup[data-pill]::before`). Attribute and first placement
+		* land in the same task, so the highlight appears in place and only later
+		* changes slide. A ResizeObserver re-measures when the group or an option
+		* changes size: a longer locale, a font arriving, a container growing, a
+		* strip wrapping onto a second line.
+		*/
+		/** The attribute marking a group whose highlight has been placed. */
+		const PILL_ATTR = "data-pill";
+		/** The pressed option, relative to the group. */
+		const ACTIVE_SELECTOR = ":scope > [data-active]";
+		const PILL_PROPERTIES = [
+			"--segment-pill-x",
+			"--segment-pill-y",
+			"--segment-pill-w",
+			"--segment-pill-h"
+		];
+		/**
+		* Write the highlight's box from the pressed option's box, or take the
+		* highlight off when nothing is pressed or the group has no layout yet.
+		* The two boxes are read in viewport pixels and turned back into the group's
+		* own CSS pixels, so a dialog that opens through a scale transform still
+		* lands the highlight on its option.
+		*/
+		function placePill(group) {
+			const item = group.querySelector(ACTIVE_SELECTOR);
+			const box = group.getBoundingClientRect();
+			if (item === null || group.offsetWidth === 0 || box.width === 0) {
+				group.removeAttribute(PILL_ATTR);
+				for (const property of PILL_PROPERTIES) group.style.removeProperty(property);
+				return;
+			}
+			const scale = box.width / group.offsetWidth;
+			const itemBox = item.getBoundingClientRect();
+			[
+				(itemBox.left - box.left) / scale - group.clientLeft,
+				(itemBox.top - box.top) / scale - group.clientTop,
+				itemBox.width / scale,
+				itemBox.height / scale
+			].forEach((value, index) => {
+				group.style.setProperty(PILL_PROPERTIES[index], `${Math.round(value * 100) / 100}px`);
+			});
+			if (!group.hasAttribute(PILL_ATTR)) group.setAttribute(PILL_ATTR, "");
+		}
+		/**
+		* Render a segmented track around the caller's option buttons.
+		* @param props - the track's attributes (role, accessible name, key handler) and its options.
+		* @returns the track.
+		*/
+		function SegmentGroup(props) {
+			const { children, className, ...rest } = props;
+			const group = (0, react.useRef)(null);
+			const count = react.Children.count(children);
+			(0, react.useLayoutEffect)(() => {
+				if (group.current !== null) placePill(group.current);
+			});
+			(0, react.useLayoutEffect)(() => {
+				const element = group.current;
+				if (element === null || typeof ResizeObserver === "undefined") return void 0;
+				const observer = new ResizeObserver(() => {
+					placePill(element);
+				});
+				observer.observe(element);
+				for (const item of Array.from(element.children)) observer.observe(item);
+				return () => {
+					observer.disconnect();
+				};
+			}, [count]);
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				...rest,
+				ref: group,
+				className: className === void 0 ? settings_card_module_css_default.segmentGroup : `${settings_card_module_css_default.segmentGroup} ${className}`,
+				children
+			});
+		}
+		//#endregion
 		//#region src/client/PluginSettingsCard.tsx
 		/**
 		* Family-shared chrome for plugin settings cards: a disclosure header naming
-		* the plugin and what its settings govern, the controls inside, and the save
-		* that writes them. Renders nothing while the namespace is unavailable — a
+		* the plugin and what its settings govern, the controls inside, and the line
+		* that reports a refused write. A pick is written the moment it is made and a
+		* typed value after a pause, so the card has no save button and nothing waits
+		* on the reader. Renders nothing while the namespace is unavailable — a
 		* deployment that does not compose the owning plugin should show no trace of
 		* it. Inlined into each consumer's client bundle; mirrors the official
 		* ui-plugin-config PluginCard in a self-contained slice.
+		*
+		* Every field inside the body is one settings row: the label and its hint on
+		* the left, the control on the right, a hairline between two rows; a narrow
+		* card stacks the control under the text (settings-card.module.css).
 		*/
+		/**
+		* What a text field inside a card reaches without its plugin wiring it: write
+		* the pending draft now (Enter, leaving the field) or put it back (Escape).
+		* Picks need neither; they are written the moment they are made.
+		*/
+		const CardApply = (0, react.createContext)(null);
+		/** Length of the body's disclosure motion; it matches `--settings-card-motion` on the card root. */
+		const BODY_MOTION_MS = 180;
 		/**
 		* Render one plugin settings card.
 		* @param props - the plugin's copy keys, its form state, and its controls.
@@ -712,12 +1014,47 @@ window.__ModuleLoader__.load({
 		function PluginSettingsCard(props) {
 			const [open, setOpen] = (0, react.useState)(props.defaultOpen ?? true);
 			const { state, alwaysOpen } = props;
+			const expanded = alwaysOpen === true || open;
+			const [bodyPhase, setBodyPhase] = (0, react.useState)(expanded ? "shown" : "hidden");
+			const bodyRef = (0, react.useRef)(null);
+			(0, react.useLayoutEffect)(() => {
+				if (expanded) {
+					if (bodyPhase === "hidden") setBodyPhase("collapsed");
+					else if (bodyPhase === "collapsed") {
+						const node = bodyRef.current;
+						if (node !== null) node.offsetHeight;
+						setBodyPhase("entering");
+					} else if (bodyPhase === "closing") setBodyPhase("entering");
+					return;
+				}
+				if (bodyPhase === "collapsed") setBodyPhase("hidden");
+				else if (bodyPhase === "entering" || bodyPhase === "shown") setBodyPhase("closing");
+			}, [expanded, bodyPhase]);
+			(0, react.useEffect)(() => {
+				if (bodyPhase !== "entering" && bodyPhase !== "closing") return;
+				const timer = setTimeout(() => {
+					setBodyPhase(bodyPhase === "entering" ? "shown" : "hidden");
+				}, BODY_MOTION_MS);
+				return () => {
+					clearTimeout(timer);
+				};
+			}, [bodyPhase]);
 			if (!state.available) return null;
 			const title = props.t(props.titleKey);
 			const description = props.t(props.descriptionKey);
-			const blocked = !state.dirty || state.invalid || state.saving;
-			const expanded = alwaysOpen === true || open;
-			const cardClass = expanded ? `${settings_card_module_css_default.cardOpen} ${settings_card_module_css_default.card}` : settings_card_module_css_default.card;
+			const descriptionTitle = props.descriptionTitleKey === void 0 ? description : props.t(props.descriptionTitleKey);
+			const baseClass = expanded ? `${settings_card_module_css_default.cardOpen} ${settings_card_module_css_default.card}` : settings_card_module_css_default.card;
+			const cardClass = props.density === "nested" ? `${baseClass} ${settings_card_module_css_default.cardNested}` : baseClass;
+			/** The body region both legs share; a hidden phase renders nothing at all. */
+			const bodyRegion = (content) => bodyPhase === "hidden" ? null : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+				className: settings_card_module_css_default.disclosure,
+				"data-state": bodyPhase,
+				ref: bodyRef,
+				children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					className: settings_card_module_css_default.body,
+					children: content
+				})
+			});
 			const header = alwaysOpen === true ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: settings_card_module_css_default.headerStatic,
 				children: [
@@ -735,18 +1072,13 @@ window.__ModuleLoader__.load({
 							children: title
 						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 							className: settings_card_module_css_default.description,
-							title: description,
+							title: descriptionTitle,
 							children: props.descriptionNode ?? description
 						})]
 					}),
 					props.headerAction !== void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 						className: settings_card_module_css_default.headerAction,
 						children: props.headerAction
-					}) : null,
-					state.dirty ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: settings_card_module_css_default.pending,
-						title: props.t("settings.unsaved"),
-						children: props.t("settings.unsaved")
 					}) : null
 				]
 			}) : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
@@ -772,18 +1104,13 @@ window.__ModuleLoader__.load({
 							children: title
 						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 							className: settings_card_module_css_default.description,
-							title: description,
+							title: descriptionTitle,
 							children: props.descriptionNode ?? description
 						})]
 					}),
 					props.headerAction !== void 0 ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 						className: settings_card_module_css_default.headerAction,
 						children: props.headerAction
-					}) : null,
-					state.dirty ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-						className: settings_card_module_css_default.pending,
-						title: props.t("settings.unsaved"),
-						children: props.t("settings.unsaved")
 					}) : null,
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
 						width: "14",
@@ -799,57 +1126,128 @@ window.__ModuleLoader__.load({
 					})
 				]
 			});
-			if (!state.exposed && props.renderChildrenWhenNotExposed !== true) {
-				const showNotice = props.hideNotExposedNotice !== true;
-				return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", {
-					className: cardClass,
-					children: [header, expanded ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-						className: settings_card_module_css_default.body,
-						children: showNotice ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-							className: settings_card_module_css_default.notExposed,
-							role: "status",
-							children: props.t("settings.notExposed")
-						}) : null
-					}) : null]
-				});
-			}
+			const notExposedNotice = state.exposed || props.hideNotExposedNotice === true ? null : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+				className: settings_card_module_css_default.notExposed,
+				role: "status",
+				children: props.t("settings.notExposed")
+			});
+			if (!state.exposed && props.renderChildrenWhenNotExposed !== true) return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", {
+				className: cardClass,
+				children: [header, bodyRegion(notExposedNotice)]
+			});
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", {
 				className: cardClass,
-				children: [header, expanded && props.headerOnly !== true ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-					className: settings_card_module_css_default.body,
-					children: [
-						!state.writable ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
-							className: settings_card_module_css_default.readOnly,
-							role: "status",
-							children: props.t("settings.readOnly")
-						}) : null,
-						props.children,
-						props.hideFooter === true ? null : /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-							className: settings_card_module_css_default.footer,
-							children: [
-								state.failed ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
-									className: settings_card_module_css_default.failed,
-									role: "status",
-									children: [props.t("settings.saveFailed"), state.failedReason ? " - " + state.failedReason : ""]
-								}) : null,
-								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-									type: "button",
-									className: settings_card_module_css_default.discard,
-									disabled: !state.dirty || state.saving,
-									onClick: props.onDiscard,
-									children: props.t("settings.discard")
-								}),
-								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-									type: "button",
-									className: settings_card_module_css_default.save,
-									disabled: blocked,
-									onClick: props.onSave,
-									children: props.t(!state.saving ? "settings.save" : "settings.saving")
-								})
-							]
-						})
-					]
-				}) : null]
+				children: [header, props.headerOnly !== true ? bodyRegion(/* @__PURE__ */ (0, react_jsx_runtime.jsxs)(react_jsx_runtime.Fragment, { children: [
+					notExposedNotice,
+					!state.writable ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						className: settings_card_module_css_default.readOnly,
+						role: "status",
+						children: props.t("settings.readOnly")
+					}) : null,
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(CardApply.Provider, {
+						value: {
+							commit: props.onSave,
+							revert: props.onDiscard
+						},
+						children: props.children
+					}),
+					props.hideFooter !== true && state.failed ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+						className: settings_card_module_css_default.failed,
+						role: "status",
+						children: [props.t("settings.saveFailed"), state.failedReason ? " - " + state.failedReason : ""]
+					}) : null
+				] })) : null]
+			});
+		}
+		/**
+		* A typed value field. Its draft is written after a pause in typing, at once on
+		* Enter or when focus leaves, and Escape puts the stored value back. `numeric`
+		* only hints the keypad: which drafts a field accepts is decided by its spec.
+		* A field given a `range` also offers the coarse slider bubble: dragging fills
+		* the draft live and releasing writes it.
+		*/
+		function ValueField(props) {
+			const apply = (0, react.useContext)(CardApply);
+			const settledByKey = (0, react.useRef)(false);
+			const onKeyDown = (event) => {
+				if (apply === null || event.key !== "Enter" && event.key !== "Escape") return;
+				event.preventDefault();
+				settledByKey.current = true;
+				if (event.key === "Enter") apply.commit();
+				else apply.revert();
+				event.currentTarget.blur();
+			};
+			const input = /* @__PURE__ */ (0, react_jsx_runtime.jsx)("input", {
+				id: props.id,
+				className: props.invalid ? settings_card_module_css_default.inputInvalid : settings_card_module_css_default.input,
+				type: "text",
+				...props.numeric === true ? { inputMode: "numeric" } : {},
+				...props.invalid ? { "aria-invalid": true } : {},
+				value: props.text,
+				placeholder: props.placeholder ?? "",
+				disabled: props.disabled,
+				onChange: (event) => {
+					props.onEdit(event.target.value);
+				},
+				onKeyDown,
+				onFocus: () => {
+					settledByKey.current = false;
+				},
+				onBlur: () => {
+					if (settledByKey.current) {
+						settledByKey.current = false;
+						return;
+					}
+					apply?.commit();
+				}
+			});
+			const { range } = props;
+			const typed = Number(props.text);
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+				className: settings_card_module_css_default.field,
+				children: [
+					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+						className: settings_card_module_css_default.head,
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("label", {
+							className: settings_card_module_css_default.label,
+							htmlFor: props.id,
+							children: props.label
+						}), props.overridden ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+							className: settings_card_module_css_default.badges,
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: settings_card_module_css_default.badge,
+								children: props.overriddenLabel
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: settings_card_module_css_default.reset,
+								disabled: props.disabled,
+								onClick: props.onReset,
+								children: props.resetLabel
+							})]
+						}) : null]
+					}),
+					range === void 0 ? input : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(RangeBubble, {
+						min: range.min,
+						max: range.max,
+						step: range.step,
+						value: props.text.trim() === "" || Number.isNaN(typed) ? range.min : typed,
+						label: `${props.label} ${range.min}–${range.max}`,
+						disabled: props.disabled,
+						onInput: (value) => {
+							props.onEdit(String(value));
+						},
+						onCommit: (value) => {
+							props.onEdit(String(value));
+							apply?.commit();
+						},
+						children: input
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+						className: props.invalid ? settings_card_module_css_default.invalid : settings_card_module_css_default.hint,
+						title: props.hintTitle,
+						children: props.invalid ? props.invalidLabel : props.hint
+					})
+				]
 			});
 		}
 		const NON_SKIN_BODY_MARKERS = /* @__PURE__ */ new Set(["dshSkinCenter", "dshSidebarCollapsed"]);
@@ -862,8 +1260,8 @@ window.__ModuleLoader__.load({
 		* renders the legacy native `<select>` untouched, so element-level skin
 		* selectors keep working; under the default appearance it renders a
 		* self-drawn `role="listbox"` popup whose open/close is transition-animated.
-		* Staged cards reach it through BooleanField/ChoiceField; immediate-apply
-		* editors (the side-card prefs) bind it directly through onEdit.
+		* Cards reach it through BooleanField/ChoiceField; editors outside a card
+		* (the side-card prefs) bind it directly through onEdit.
 		* 双模式下拉框：皮肤激活时用原生 select，默认外观用自绘动画弹层。
 		*/
 		function SelectField(props) {
@@ -1021,14 +1419,48 @@ window.__ModuleLoader__.load({
 				}) : null]
 			});
 		}
-		/** A staged boolean field: 继承 / 开 / 关. */
+		/**
+		* A visible segmented group for a small set of mutually exclusive values.
+		* Every option stays on screen, so inherit/on/off and short enum fields take
+		* one click without opening a popup. The pressed option carries the group's
+		* sliding highlight and `aria-pressed`; the group takes the field label as its
+		* accessible name.
+		*/
+		function SegmentField(props) {
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)(SegmentGroup, {
+				id: props.id,
+				role: "group",
+				"aria-label": props.label,
+				"aria-invalid": props.invalid || void 0,
+				children: props.options.map((option, index) => {
+					const active = option.value === props.value;
+					return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: settings_card_module_css_default.segment,
+						"aria-pressed": active,
+						disabled: props.disabled,
+						"data-active": active ? "" : void 0,
+						"data-segment-index": index,
+						onClick: () => {
+							if (!active) props.onEdit(option.value);
+						},
+						children: option.label
+					}, option.value);
+				})
+			});
+		}
+		/** A boolean field: 继承 / 开 / 关. */
 		function BooleanField(props) {
+			const segmented = props.presentation !== "select";
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: settings_card_module_css_default.field,
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: settings_card_module_css_default.head,
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("label", {
+						children: [segmented ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: settings_card_module_css_default.label,
+							children: props.label
+						}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("label", {
 							className: settings_card_module_css_default.label,
 							htmlFor: props.id,
 							children: props.label
@@ -1046,7 +1478,28 @@ window.__ModuleLoader__.load({
 							})]
 						}) : null]
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(SelectField, {
+					segmented ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(SegmentField, {
+						id: props.id,
+						label: props.label,
+						options: [
+							{
+								value: "",
+								label: props.inheritLabel
+							},
+							{
+								value: "true",
+								label: props.onLabel
+							},
+							{
+								value: "false",
+								label: props.offLabel
+							}
+						],
+						value: props.text,
+						disabled: props.disabled,
+						invalid: props.invalid,
+						onEdit: props.onEdit
+					}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(SelectField, {
 						id: props.id,
 						options: [
 							{
@@ -1069,19 +1522,28 @@ window.__ModuleLoader__.load({
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 						className: settings_card_module_css_default.hint,
+						title: props.hintTitle,
 						children: props.hint
 					})
 				]
 			});
 		}
-		/** A staged enumerated field rendered as a select. */
+		/** An enumerated field, selecting or segmenting its small choice set. */
 		function ChoiceField(props) {
+			const segmented = props.presentation === "segment";
+			const options = [{
+				value: "",
+				label: props.inheritLabel
+			}, ...props.choices];
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: settings_card_module_css_default.field,
 				children: [
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: settings_card_module_css_default.head,
-						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("label", {
+						children: [segmented ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: settings_card_module_css_default.label,
+							children: props.label
+						}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("label", {
 							className: settings_card_module_css_default.label,
 							htmlFor: props.id,
 							children: props.label
@@ -1099,12 +1561,17 @@ window.__ModuleLoader__.load({
 							})]
 						}) : null]
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(SelectField, {
+					segmented ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)(SegmentField, {
 						id: props.id,
-						options: [{
-							value: "",
-							label: props.inheritLabel
-						}, ...props.choices],
+						label: props.label,
+						options,
+						value: props.text,
+						disabled: props.disabled,
+						invalid: props.invalid,
+						onEdit: props.onEdit
+					}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)(SelectField, {
+						id: props.id,
+						options,
 						value: props.text,
 						disabled: props.disabled,
 						invalid: props.invalid,
@@ -1112,17 +1579,57 @@ window.__ModuleLoader__.load({
 					}),
 					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 						className: props.invalid ? settings_card_module_css_default.invalid : settings_card_module_css_default.hint,
+						title: props.hintTitle,
 						children: props.invalid ? props.invalidLabel : props.hint
 					})
 				]
 			});
 		}
-		//#endregion
-		//#region src/client/settings-form.ts
+		/** A whole- or decimal-number field. An empty draft clears the field; any other draft that is not a finite number within the constraints stays unwritten. */
+		function numberField(field, constraints = {}) {
+			const { integer = false, min, max } = constraints;
+			return {
+				field,
+				entry: "type",
+				format: (value) => typeof value === "number" ? String(value) : "",
+				parse: (text) => {
+					const trimmed = text.trim();
+					if (trimmed === "") return { kind: "clear" };
+					const parsed = Number(trimmed);
+					if (!Number.isFinite(parsed)) return void 0;
+					if (integer && !Number.isInteger(parsed)) return void 0;
+					if (min !== void 0 && parsed < min) return void 0;
+					if (max !== void 0 && parsed > max) return void 0;
+					return {
+						kind: "set",
+						value: parsed
+					};
+				}
+			};
+		}
+		/**
+		* A free-text field. An empty draft clears the field. `entry` is `pick` when
+		* the text arrives whole from a picker (a preset or a reasoning level).
+		*/
+		function textField(field, entry = "type") {
+			return {
+				field,
+				entry,
+				format: (value) => typeof value === "string" ? value : "",
+				parse: (text) => {
+					const trimmed = text.trim();
+					return trimmed === "" ? { kind: "clear" } : {
+						kind: "set",
+						value: trimmed
+					};
+				}
+			};
+		}
 		/** A boolean field, edited through true/false draft text. */
 		function booleanField(field) {
 			return {
 				field,
+				entry: "pick",
 				format: (value) => typeof value === "boolean" ? String(value) : "",
 				parse: (text) => {
 					const trimmed = text.trim();
@@ -1142,6 +1649,7 @@ window.__ModuleLoader__.load({
 		function choiceField(field, choices) {
 			return {
 				field,
+				entry: "pick",
 				format: (value) => typeof value === "string" && choices.includes(value) ? value : "",
 				parse: (text) => {
 					if (text === "") return { kind: "clear" };
@@ -1153,12 +1661,14 @@ window.__ModuleLoader__.load({
 			};
 		}
 		/**
-		* Stages one card's edits over one settings namespace and writes them on save.
+		* Applies one card's edits to one settings namespace as the reader makes them.
 		*
 		* The Host is the only authority on whether a value was accepted — its
 		* validators own the constraints no schema can express — so the outcome is
-		* read back from the section rather than predicted here. A save that did not
-		* land keeps its drafts, so the user can correct them instead of retyping.
+		* read back from the section rather than predicted here. A write that did not
+		* land puts each pick back to the stored value, the way a switch that could not
+		* flip springs back, and keeps typed text so the reader can correct it instead
+		* of retyping.
 		*/
 		var CardForm = class {
 			scope;
@@ -1168,6 +1678,8 @@ window.__ModuleLoader__.load({
 			/** The form subscription installed in the constructor; released by dispose(). */
 			disposeForm;
 			disposed = false;
+			/** The pending write of typed text, waiting for typing to pause. */
+			typePause;
 			saving = false;
 			/** A save asked for while one was in flight; it runs once the first settles (#1754). */
 			saveQueued = false;
@@ -1188,6 +1700,7 @@ window.__ModuleLoader__.load({
 			dispose() {
 				if (this.disposed) return;
 				this.disposed = true;
+				clearTimeout(this.typePause);
 				this.disposeForm();
 				this.listeners.clear();
 			}
@@ -1199,7 +1712,7 @@ window.__ModuleLoader__.load({
 				});
 				return store;
 			}
-			/** Read the card-level state: what the Host serves, and what a save would do. */
+			/** Read the card-level state: what the Host serves, and what is still waiting to be written. */
 			shell() {
 				const snapshot = this.scope.getSnapshot();
 				const plan = this.plan();
@@ -1246,9 +1759,10 @@ window.__ModuleLoader__.load({
 						});
 					},
 					save: () => {
-						this.requestSave();
+						this.applyNow();
 					},
 					discard: () => {
+						clearTimeout(this.typePause);
 						if (this.staged.size === 0 && !this.failed) return;
 						this.staged.clear();
 						this.failed = false;
@@ -1258,32 +1772,14 @@ window.__ModuleLoader__.load({
 				};
 			}
 			/**
-			* Write every staged edit in one atomic form mutation, then re-seed from
-			* what the Host accepted.
-			*
-			* The whole batch rides one mutate, so cross-field validate hooks
-			* (baseURL+model) judge it as a unit: the Host either applies every write
-			* or refuses the batch. The form contract answers a refusal or a skipped
-			* write with `false` (it recovers with a fresh Host view instead of
-			* throwing), so the outcome is judged twice: the answer itself, and then the
-			* settled snapshot read back one planned write at a time. One missed write
-			* fails the whole save. A transport that rejects instead (the dsh-web bridge
-			* controller on a dead connection) reports through the same failure path
-			* with its rejection message. A save that did not land keeps its drafts, so
-			* the user can correct them instead of retyping.
-			* @returns settlement after the mutation and the read-back.
-			*/
-			/**
-			* Run one save, and re-run it once if another was asked for while this one
+			* Run one write, and re-run it once if another was asked for while this one
 			* was still in flight.
 			*
-			* A save is a Host round trip that also drives the profile reconcile, and
-			* the Host runs that write inside one exclusive transaction. Answering a
-			* press that arrives mid-flight by returning immediately dropped the edit
-			* with no explanation, which is the "the save button stops working after a
-			* few rounds" report (#1754). Serializing instead means a save pressed while
-			* another is still settling runs against the settled state - which is what
-			* the operator meant by pressing it again.
+			* A write is a Host round trip that also drives the profile reconcile, and
+			* the Host runs it inside one exclusive transaction. Answering an edit that
+			* arrives mid-flight by returning immediately dropped it with no explanation
+			* (#1754). Serializing instead means an edit made while another write is
+			* still settling is written against the settled state.
 			* @returns settlement after the mutation and the read-back.
 			*/
 			async requestSave() {
@@ -1296,12 +1792,28 @@ window.__ModuleLoader__.load({
 				this.saveQueued = false;
 				await this.requestSave();
 			}
+			/**
+			* Write every valid draft in one atomic form mutation, then re-seed from
+			* what the Host accepted. A draft the field does not accept stays on screen,
+			* unwritten, without holding the others back.
+			*
+			* The batch rides one mutate, so cross-field validate hooks (baseURL+model)
+			* judge it as a unit: the Host either applies every write or refuses the
+			* batch. The form contract answers a refusal or a skipped write with `false`
+			* (it recovers with a fresh Host view instead of throwing), so the outcome is
+			* judged twice: the answer itself, and then the settled snapshot read back
+			* one planned write at a time. One missed write fails the whole batch. A
+			* transport that rejects instead (the dsh-web bridge controller on a dead
+			* connection) reports through the same failure path with its rejection
+			* message. A batch that did not land puts its picks and clears back to the
+			* stored value and keeps its typed text, so the reader can correct it.
+			* @returns settlement after the mutation and the read-back.
+			*/
 			async save() {
-				const plan = this.plan();
-				const valid = plan.filter((item) => item.judge !== void 0);
-				if (plan.length === 0 || this.saving || valid.length !== plan.length) return;
+				const valid = this.plan().filter((item) => item.judge !== void 0);
+				if (valid.length === 0 || this.saving) return;
 				const pending = /* @__PURE__ */ new Map();
-				for (const item of plan) pending.set(item.field, this.staged.get(item.field));
+				for (const item of valid) pending.set(item.field, this.staged.get(item.field));
 				this.saving = true;
 				this.failed = false;
 				this.failedReason = void 0;
@@ -1322,16 +1834,19 @@ window.__ModuleLoader__.load({
 					failedReason = error instanceof Error ? error.message : String(error);
 				}
 				const landed = accepted && failedReason === void 0 && valid.every((item) => item.judge());
-				for (const [field, before] of pending) if (landed && this.staged.get(field) === before) this.staged.delete(field);
+				for (const [field, before] of pending) {
+					if (this.staged.get(field) !== before) continue;
+					if (landed || before === void 0 || before.clear || this.specOf(field).entry === "pick") this.staged.delete(field);
+				}
 				this.saving = false;
 				this.failed = !landed;
 				this.failedReason = failedReason;
 				this.publish();
 			}
 			/**
-			* Every staged edit a save would write. An entry whose draft is not a value
-			* its field accepts carries no write: the form is still dirty, and the save
-			* refuses rather than dropping the edit. A staged edit that matches the
+			* Every staged edit a write would carry. An entry whose draft is not a value
+			* its field accepts carries no write: the form is still dirty, and the draft
+			* stays on screen rather than being dropped. A staged edit that matches the
 			* effective section is not a write at all.
 			* @returns the planned writes, in the order the fields were staged.
 			*/
@@ -1386,7 +1901,7 @@ window.__ModuleLoader__.load({
 			*/
 			landedSet(field, value) {
 				if (this.specOf(field).secret) return true;
-				return this.userLayer()?.[field] === value;
+				return jsonValuesEqual(this.userLayer()?.[field], value);
 			}
 			/**
 			* Read-back judgment for a planned unset: the field must be gone from the
@@ -1395,11 +1910,30 @@ window.__ModuleLoader__.load({
 			landedUnset(field) {
 				return !this.stored(field);
 			}
+			/**
+			* Take one edit and schedule its write: a pick or a clear is written now,
+			* typed text once typing has rested for TYPE_PAUSE_MS.
+			*/
 			stage(field, edit) {
 				this.staged.set(field, edit);
 				this.failed = false;
 				this.failedReason = void 0;
 				this.publish();
+				if (edit.clear || this.specOf(field).entry === "pick") {
+					this.applyNow();
+					return;
+				}
+				clearTimeout(this.typePause);
+				this.typePause = setTimeout(() => {
+					this.applyNow();
+				}, 600);
+			}
+			/** Write every pending draft now, taking the place of a waiting pause. */
+			applyNow() {
+				clearTimeout(this.typePause);
+				this.typePause = void 0;
+				if (this.disposed) return;
+				this.requestSave();
 			}
 			specOf(field) {
 				const spec = this.specs.get(field);
@@ -1426,8 +1960,44 @@ window.__ModuleLoader__.load({
 				for (const listener of this.listeners) listener();
 			}
 		};
+		/** Structural equality for JSON settings values (primitives, arrays, plain objects). */
+		function jsonValuesEqual(left, right) {
+			if (Object.is(left, right)) return true;
+			if (typeof left !== "object" || left === null || typeof right !== "object" || right === null) return false;
+			if (Array.isArray(left) || Array.isArray(right)) {
+				if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+				return left.every((item, index) => jsonValuesEqual(item, right[index]));
+			}
+			const a = left;
+			const b = right;
+			const keysA = Object.keys(a).filter((key) => a[key] !== void 0);
+			const keysB = Object.keys(b).filter((key) => b[key] !== void 0);
+			if (keysA.length !== keysB.length) return false;
+			return keysA.every((key) => Object.hasOwn(b, key) && jsonValuesEqual(a[key], b[key]));
+		}
 		//#endregion
 		//#region src/client/LiangShenSettingsCard.tsx
+		/** A tool family entry: a prefix ending in exactly one trailing star. */
+		const FAMILY_ENTRY_RE = /^[^*]+\*$/;
+		/**
+		* The on-demand tool family list: comma separated entries, each a prefix with
+		* one trailing star. Blank clears the field; any malformed entry holds the
+		* draft unwritten.
+		*/
+		function pagedToolPatternsField(field) {
+			return {
+				...textField(field),
+				parse: (text) => {
+					const entries = text.split(",").map((entry) => entry.trim()).filter((entry) => entry !== "");
+					if (entries.length === 0) return { kind: "clear" };
+					if (!entries.every((entry) => FAMILY_ENTRY_RE.test(entry))) return void 0;
+					return {
+						kind: "set",
+						value: entries.join(", ")
+					};
+				}
+			};
+		}
 		/** Wire presentations the tool catalog accepts (mirrors the Host schema). */
 		const PRESENTATION_CHOICES = ["ptc", "native"];
 		/** Bridges the `liangshen` settings form onto the card's staged form. */
@@ -1440,7 +2010,12 @@ window.__ModuleLoader__.load({
 					booleanField("enabled"),
 					booleanField("announceToAgent"),
 					choiceField("presentation", PRESENTATION_CHOICES),
-					booleanField("dispatcher")
+					booleanField("dispatcher"),
+					pagedToolPatternsField("pagedToolPatterns"),
+					numberField("idleReclaimSteps", {
+						integer: true,
+						min: 0
+					})
 				]);
 				this.store = this.form.bind(() => this.projection());
 			}
@@ -1450,7 +2025,9 @@ window.__ModuleLoader__.load({
 					enabled: this.form.field("enabled"),
 					announceToAgent: this.form.field("announceToAgent"),
 					presentation: this.form.field("presentation"),
-					dispatcher: this.form.field("dispatcher")
+					dispatcher: this.form.field("dispatcher"),
+					pagedToolPatterns: this.form.field("pagedToolPatterns"),
+					idleReclaimSteps: this.form.field("idleReclaimSteps")
 				};
 			}
 			/**
@@ -1533,6 +2110,7 @@ window.__ModuleLoader__.load({
 							value: choice,
 							label: t(`presentation.${choice}`)
 						})),
+						presentation: "segment",
 						...fieldProps,
 						...state.presentation,
 						onEdit: (text) => {
@@ -1555,6 +2133,36 @@ window.__ModuleLoader__.load({
 						},
 						onReset: () => {
 							props.resetField("dispatcher");
+						}
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ValueField, {
+						id: "settings-liangshen-paged-tool-patterns",
+						label: t("settings.pagedToolPatterns"),
+						hint: t("settings.pagedToolPatternsHint"),
+						placeholder: "browser_*, task_board_*",
+						...fieldProps,
+						invalidLabel: t("settings.pagedToolPatternsInvalid"),
+						...state.pagedToolPatterns,
+						onEdit: (text) => {
+							props.edit("pagedToolPatterns", text);
+						},
+						onReset: () => {
+							props.resetField("pagedToolPatterns");
+						}
+					}),
+					/* @__PURE__ */ (0, react_jsx_runtime.jsx)(ValueField, {
+						id: "settings-liangshen-idle-reclaim-steps",
+						label: t("settings.idleReclaimSteps"),
+						hint: t("settings.idleReclaimStepsHint"),
+						placeholder: "0",
+						...fieldProps,
+						invalidLabel: t("settings.idleReclaimStepsInvalid"),
+						...state.idleReclaimSteps,
+						onEdit: (text) => {
+							props.edit("idleReclaimSteps", text);
+						},
+						onReset: () => {
+							props.resetField("idleReclaimSteps");
 						}
 					})
 				]
@@ -1585,32 +2193,34 @@ window.__ModuleLoader__.load({
 			"burst.line1": "三秒，三辈子的代码",
 			"burst.line2": "文言文 · 二进制 · 摩斯电码",
 			"settings.title": "梁神模式",
-			"settings.description": "控制本插件与工具面呈现方式。",
-			"settings.enabled": "启用梁神模式",
-			"settings.enabledHint": "关闭后不声明预设、也不发 agent 公告。",
-			"settings.announceToAgent": "向 agent 公告本插件",
-			"settings.announceToAgentHint": "开启后向每一轮 agent 系统提示注入本插件公告；默认关闭以保持提示词干净。",
-			"settings.presentation": "工具面呈现方式",
-			"settings.presentationHint": "写入本插件声明的预设的 tool-catalog 行：ptc（出厂默认）把 wire 收拢为 run_code，其余工具经生成的 SDK 调用；native 保持原生工具清单。改动立即生效，但已开始的会话保持其已声明的组合。",
-			"settings.dispatcher": "调度者身份",
-			"settings.dispatcherHint": "开启后本模式按调度 Agent 工作：先分诊复杂度（L0/L1 直接执行，L2 走完整流程），L2 任务先澄清访谈再规划，由主代理派发子代理并逐层审查与验收。与工具面呈现方式无关，只决定身份与流程纪律。出厂默认开启；关闭后回到仅含工作纪律的极简 persona。",
+			"settings.description": "梁神模式的开关、工具面与调度身份。",
+			"settings.enabled": "总开关",
+			"settings.enabledHint": "关掉后不再声明预设。",
+			"settings.announceToAgent": "公告给 agent",
+			"settings.announceToAgentHint": "每一轮系统提示都带上本插件公告。",
+			"settings.presentation": "工具面",
+			"settings.presentationHint": "ptc 把工具收进 run_code，native 保留原生清单。",
+			"settings.dispatcher": "调度身份",
+			"settings.dispatcherHint": "按调度 Agent 工作：分诊、访谈、派发子代理。",
+			"settings.pagedToolPatterns": "按需工具族",
+			"settings.pagedToolPatternsHint": "逗号分隔，每项以单个 * 结尾。命中这些前缀的工具默认不进上下文，需要时用 tool_activate 按需加载。留空继承出厂 7 项：mcp__*, browser_*, task_board_*, team_*, squad*, ui_*, ssh_*。",
+			"settings.pagedToolPatternsInvalid": "每项须是非空前缀并以单个 * 结尾，逗号分隔，例如 task_board_*。",
+			"settings.idleReclaimSteps": "空闲收回步数",
+			"settings.idleReclaimStepsHint": "连续 N 步没有成功调用的已激活工具族会过期，但只在下次激活或压缩时收回——这些时机前缀缓存本就要重建，因此不新增缓存重建；收回前仍常驻可用，再次调用即续命。0 或留空 = 不收回（出厂行为）。",
+			"settings.idleReclaimStepsInvalid": "填一个非负整数（步数），例如 30；0 或留空表示不收回。",
 			"settings.on": "开",
 			"settings.off": "关",
-			"settings.inherit": "继承（跟随部署默认）",
-			"settings.overridden": "已覆盖",
-			"settings.reset": "重置",
-			"settings.notExposed": "当前 DSH 版本未向设置页暴露本插件的配置命名空间，表单不可用。可编辑 ~/.dsh/settings.yaml 直接配置，或将本命名空间加入 Host 设置白名单后重启。",
-			"settings.readOnly": "当前部署的设置只读。",
+			"settings.inherit": "继承",
+			"settings.overridden": "已修改",
+			"settings.reset": "恢复默认",
+			"settings.notExposed": "这个版本的 DSH 没有开放梁神模式的设置。",
+			"settings.readOnly": "设置只读。",
 			"settings.expand": "展开设置",
 			"settings.collapse": "收起设置",
-			"settings.save": "保存",
-			"settings.saving": "保存中…",
-			"settings.discard": "放弃",
-			"settings.unsaved": "未保存",
-			"settings.saveFailed": "部署未接受这些值，已保留供你修改。",
-			"settings.invalidValue": "该取值不被接受",
-			"presentation.ptc": "ptc（仅 run_code）",
-			"presentation.native": "native（原生工具清单）"
+			"settings.saveFailed": "没有保存成功。",
+			"settings.invalidValue": "填一个可用的值。",
+			"presentation.ptc": "ptc",
+			"presentation.native": "native"
 		};
 		/** English counterpart; the key set mirrors {@link zh} exactly. */
 		const en = {
@@ -1630,32 +2240,34 @@ window.__ModuleLoader__.load({
 			"burst.line1": "Three seconds, three lifetimes of code",
 			"burst.line2": "Classical Chinese · Binary · Morse code",
 			"settings.title": "LiangShen mode",
-			"settings.description": "Controls this plugin and the wire presentation.",
-			"settings.enabled": "Enable LiangShen mode",
-			"settings.enabledHint": "When off, the preset is not declared and the agent announcement does not run.",
-			"settings.announceToAgent": "Announce this plugin to agents",
-			"settings.announceToAgentHint": "Adds this plugin announcement to every agent system prompt; off by default so prompts stay clean.",
-			"settings.presentation": "Wire presentation",
-			"settings.presentationHint": "Written into the tool-catalog row of the preset this plugin declares: ptc (the shipped default) collapses the wire to run_code with every other tool reached through the generated SDK; native keeps the native roster. A change re-declares the preset immediately; sessions that already started keep the composition they declared.",
-			"settings.dispatcher": "Dispatcher identity",
-			"settings.dispatcherHint": "When on, the mode works as a dispatcher agent: it triages complexity first (L0/L1 work is done directly, an L2 task runs the full flow), clarifies an L2 task through an interview before planning, and the lead agent dispatches subagents and reviews and accepts them layer by layer. It is unrelated to the wire presentation and decides identity and process discipline only. On by default; switching it off returns the prompt to the bare persona with its working discipline.",
+			"settings.description": "The mode switch, the wire presentation and the dispatcher identity.",
+			"settings.enabled": "Master switch",
+			"settings.enabledHint": "When off, the preset is no longer declared.",
+			"settings.announceToAgent": "Announce to agents",
+			"settings.announceToAgentHint": "Every system prompt carries this plugin note.",
+			"settings.presentation": "Wire",
+			"settings.presentationHint": "ptc folds tools into run_code; native keeps the native roster.",
+			"settings.dispatcher": "Dispatcher",
+			"settings.dispatcherHint": "Works as a dispatcher: triage, interview, then dispatch subagents.",
+			"settings.pagedToolPatterns": "On-demand tool families",
+			"settings.pagedToolPatternsHint": "Comma separated, each entry ending in a single *. Tools matching these prefixes stay out of context by default; load them with tool_activate when needed. Leave empty to inherit the 7 factory entries: mcp__*, browser_*, task_board_*, team_*, squad*, ui_*, ssh_*.",
+			"settings.pagedToolPatternsInvalid": "Each entry must be a non-empty prefix ending in a single *, comma separated, for example task_board_*.",
+			"settings.idleReclaimSteps": "Idle reclaim steps",
+			"settings.idleReclaimStepsHint": "An activated tool family with no successful call for N steps expires, but is reclaimed only at the next activation or compaction — moments the prefix cache rebuilds anyway, so no extra rebuild is paid. It stays resident and callable until then; any call refreshes it. 0 or empty = no reclaim (factory behavior).",
+			"settings.idleReclaimStepsInvalid": "Enter a non-negative integer number of steps, for example 30; 0 or empty means no reclaim.",
 			"settings.on": "On",
 			"settings.off": "Off",
-			"settings.inherit": "Inherit (deployment default)",
-			"settings.overridden": "Overridden",
-			"settings.reset": "Reset",
-			"settings.notExposed": "This DSH version does not expose this plugin's settings namespace to the configuration page, so the form is unavailable. Edit ~/.dsh/settings.yaml directly, or add the namespace to the Host settings allowlist and restart.",
-			"settings.readOnly": "This deployment serves settings read-only.",
+			"settings.inherit": "Inherit",
+			"settings.overridden": "Changed",
+			"settings.reset": "Reset to default",
+			"settings.notExposed": "This DSH version does not open the LiangShen settings.",
+			"settings.readOnly": "Settings are read-only.",
 			"settings.expand": "Show settings",
 			"settings.collapse": "Hide settings",
-			"settings.save": "Save",
-			"settings.saving": "Saving…",
-			"settings.discard": "Discard",
-			"settings.unsaved": "Unsaved",
-			"settings.saveFailed": "The deployment did not accept these values; they were left for you to correct.",
-			"settings.invalidValue": "The value is not accepted",
-			"presentation.ptc": "ptc (run_code only)",
-			"presentation.native": "native (native tool roster)"
+			"settings.saveFailed": "Not saved.",
+			"settings.invalidValue": "Enter a value this field accepts.",
+			"presentation.ptc": "ptc",
+			"presentation.native": "native"
 		};
 		//#endregion
 		//#region src/client/plugin-card-seat.ts
@@ -1749,6 +2361,7 @@ window.__ModuleLoader__.load({
 				if (reconciling) return;
 				const target = familyGroupLoaded(ctx) ? FAMILY_PLUGIN_CARD_SEAT : OFFICIAL_PLUGIN_CARD_SEAT;
 				if (current === target) return;
+				if (typeof slots.spec === "function" && slots.spec(target) === void 0) return;
 				reconciling = true;
 				const previous = dispose;
 				dispose = void 0;
@@ -1778,9 +2391,9 @@ window.__ModuleLoader__.load({
 				}
 			};
 			if (typeof ctx.on === "function") try {
-				ctx.on("slots/changed", () => {
+				ctx.on("slots/changed", (() => {
 					reconcile();
-				});
+				}));
 			} catch {}
 			reconcile();
 		}
