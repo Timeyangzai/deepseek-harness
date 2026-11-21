@@ -1,0 +1,16 @@
+# Bilingual-pair consistency record for guide.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/upgrade-guide/v0.2.2-rc.5/opencode-zen-free-provider-removal/guide.md
+/:
+  en: ec4c0b9e1bf56238
+  zh: 881e333d53bbb9e2
+/opencode-zen-free-leaves-the-desktop-compatibility-profile:
+  en: 392cb009205a5546
+  zh: 1a21a88125998044
+/opencode-zen-free-leaves-the-desktop-compatibility-profile/change:
+  en: 3827b47d226ff20d
+  zh: b0a6a8860005aeba
+/opencode-zen-free-leaves-the-desktop-compatibility-profile/migration:
+  en: af2bef74bf9a3dc5
+  zh: bcd8e21de3b76676

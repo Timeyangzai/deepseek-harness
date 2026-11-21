@@ -32,6 +32,8 @@ test('plan leaves user files and plugin directories untouched', t => {
   assert.equal(dependencies.dshmarket, '1.74.0');
   assert.equal(dependencies['dsh-input-traffic'], '0.7.17');
   assert.equal(dependencies['billion-context'], '0.1.216');
+  assert.equal(dependencies['dsh-purge-community'], 'file:../../local-plugins/dsh-purge-community-1.7.20.tgz');
+  assert.equal(Object.hasOwn(dependencies, '@jiesou/dsh-opencode-zen-free-provider'), false);
   assert.deepEqual(readFileSync(join(profile, 'package.json')), original);
   assert.equal(existsSync(join(root, 'local-plugins')), false);
 });
@@ -49,6 +51,9 @@ test('install passes offline mode, retains user data and existing bundles, and i
   assert.equal(manifest.dependencies['dsh-input-traffic'], '0.7.17');
   assert.equal(manifest.dsh.profile.bundles.filter(x => x === 'dsh-input-traffic').length, 1);
   assert.equal(manifest.dependencies['billion-context'], '0.1.216');
+  assert.equal(manifest.dependencies['dsh-purge-community'], 'file:../../local-plugins/dsh-purge-community-1.7.20.tgz');
+  assert.equal(manifest.dsh.profile.bundles.filter(x => x === 'dsh-purge-community').length, 1);
+  assert.equal(existsSync(join(root, 'local-plugins', 'dsh-purge-community-1.7.20.tgz')), true);
   assert.ok(manifest.dsh.profile.bundles.includes('@deepseek-ai/dsh-base'));
   assert.deepEqual(JSON.parse(readFileSync(join(profile, 'pnpm-arguments.json'))), ['--dir', profile, 'install', '--optimistic-repeat-install=false', '--offline']);
   assert.equal(readFileSync(join(profile, 'cordis.patch.yml'), 'utf8'), '# preserve settings\n');
@@ -85,20 +90,21 @@ test('dependency updates retain an installed bundle that is not enabled', t => {
   assert.equal(installed.dsh.profile.bundles.includes('@goodandready/dsh-goal'), false);
 });
 
-test('upgrade removes the retired AgentTeam bundle and preserves custom bundles', t => {
+test('upgrade replaces legacy Purge and retired AgentTeam while preserving custom bundles', t => {
   const { root, profile } = fixture(t);
   const manifestPath = join(profile, 'package.json');
   const previous = JSON.parse(readFileSync(manifestPath));
   const retired = '@deepseek-ai/dsh-experimental-agent-team-profile';
   const custom = 'custom-plugin';
   previous.dependencies[retired] = '0.2.1-rc.2';
+  previous.dependencies['dsh-purge'] = 'file:../../local-plugins/dsh-purge';
   previous.dependencies[custom] = '1.0.0';
-  previous.dsh.profile.bundles.push(retired, custom);
+  previous.dsh.profile.bundles.push(retired, 'dsh-purge', custom);
   writeFileSync(manifestPath, JSON.stringify(previous) + '\n');
 
   const plan = run(root, ['--plan']);
   assert.equal(plan.status, 0, plan.stderr);
-  assert.deepEqual(JSON.parse(plan.stdout).removeBundles, [retired]);
+  assert.deepEqual(JSON.parse(plan.stdout).removeBundles, [retired, 'dsh-purge']);
   assert.deepEqual(JSON.parse(readFileSync(manifestPath)), previous);
 
   const result = run(root);
@@ -106,6 +112,9 @@ test('upgrade removes the retired AgentTeam bundle and preserves custom bundles'
   const installed = JSON.parse(readFileSync(manifestPath));
   assert.equal(Object.hasOwn(installed.dependencies, retired), false);
   assert.equal(installed.dsh.profile.bundles.includes(retired), false);
+  assert.equal(Object.hasOwn(installed.dependencies, 'dsh-purge'), false);
+  assert.equal(installed.dsh.profile.bundles.includes('dsh-purge'), false);
+  assert.equal(installed.dsh.profile.bundles.includes('dsh-purge-community'), true);
   assert.equal(installed.dependencies[custom], '1.0.0');
   assert.equal(installed.dsh.profile.bundles.includes(custom), true);
 });

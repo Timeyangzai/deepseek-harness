@@ -2,9 +2,8 @@
   "name": "dsh-profile-desktop",
   "private": true,
   "dependencies": {
-    "@jiesou/dsh-opencode-zen-free-provider": "file:../../local-plugins/dsh-opencode-zen-free-provider",
     "@linxin666/dsh-liangshen": "file:../../local-plugins/dsh-liangshen",
-    "dsh-purge": "file:../../local-plugins/dsh-purge",
+    "dsh-purge-community": "file:../../local-plugins/dsh-purge-community-1.7.20.tgz",
     "dshmarket": "1.74.0",
     "@goodandready/dsh-goal": "0.2.46",
     "billion-context": "0.1.216",
@@ -17,9 +16,8 @@
       "bundles": [
         "@deepseek-ai/dsh-base",
         "@deepseek-ai/dsh-web-app",
-        "dsh-purge",
+        "dsh-purge-community",
         "@linxin666/dsh-liangshen",
-        "@jiesou/dsh-opencode-zen-free-provider",
         "dshmarket",
         "billion-context",
         "dsh-free-search",

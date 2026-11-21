@@ -12,11 +12,6 @@
         systemPromptUpdate: in-history
       - id: global/hy3
         name: hy3
-- id: agent-default-model
-  name: '@deepseek-ai/dsh-agent-default-model'
-  config:
-    provider: opencode-zen-free-provider
-    model: deepseek-v4.1-flash-free
 - id: locale
   name: '@deepseek-ai/dsh-client-locale'
   config:

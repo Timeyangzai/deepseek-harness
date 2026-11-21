@@ -8,7 +8,7 @@ DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的�
 
 文档：[https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
 
-本分支的 Windows 与 macOS 桌面插件安装说明见[桌面兼容插件](compat-plugins/README.zh.md)，包含破甲、梁神、OpenCode Zen Free 和 dshmarket。
+本分支的 Windows 与 macOS 桌面插件安装说明见[桌面兼容插件](compat-plugins/README.zh.md)，包含破甲、梁神和 dshmarket。
 
 ## 开发者预览
 

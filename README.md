@@ -8,7 +8,7 @@ It is built on an **everything-is-a-plugin** architecture and powered by [Cordis
 
 Documentation: [https://deepseek-harness.github.io/deepseek-harness/](https://deepseek-harness.github.io/deepseek-harness/)
 
-This fork's Windows and macOS desktop plugin setup is documented in [Desktop compatibility plugins](compat-plugins/README.md), including Purge, LiangShen, OpenCode Zen Free and dshmarket.
+This fork's Windows and macOS desktop plugin setup is documented in [Desktop compatibility plugins](compat-plugins/README.md), including Purge, LiangShen and dshmarket.
 
 ## Developer preview
 

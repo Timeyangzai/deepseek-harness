@@ -3,26 +3,23 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write compat-plugins/README.md
 /desktop-compatibility-plugins:
-  en: 7e0dc9dd6057ad71
-  zh: 50b72eea0458aa8e
+  en: 7d19ee7e1ca8b044
+  zh: e7cb88b85c38af6a
 /desktop-compatibility-plugins/plugins:
-  en: a95a4eb26f050f90
-  zh: 55fc7725f1a8b635
+  en: f29d9ccf48b394f8
+  zh: be8894ba318708df
 /desktop-compatibility-plugins/windows-macos-installation:
-  en: f632642ac0f6fc83
-  zh: d9090dab522e65c8
+  en: a8dd491792fd7996
+  zh: 0e6c53ff54c7294b
 /desktop-compatibility-plugins/busy-time-input:
   en: ee6ddf63791b9361
   zh: 958b47434c7566a7
 /desktop-compatibility-plugins/purge-backup-and-recovery:
-  en: 4b6169bccbcdf80f
-  zh: 0e3cf38e0456ea21
+  en: 3f218fa0c5b9cc83
+  zh: c62280d1c6908e0e
 /desktop-compatibility-plugins/model-configuration:
-  en: 640abf060f34ede6
-  zh: 979c87de232e3154
-/desktop-compatibility-plugins/zen-recovery:
-  en: ecee0da5da9ad67e
-  zh: f3f0362f567531a2
+  en: c9d4edaf74c2a8b4
+  zh: 81ea910e0738dad1
 /desktop-compatibility-plugins/verification-and-local-files:
   en: 1dfef57295c19a0e
   zh: b14ced3814b8f661

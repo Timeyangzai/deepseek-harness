@@ -1,5 +1,6 @@
 /** Install the shared Desktop plugin set without replacing user settings or application binaries. */
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,13 +24,20 @@ const home = resolve(options['dsh-home']);
 const profile = join(home, 'profiles', 'desktop');
 const manifestPath = join(profile, 'package.json');
 const template = JSON.parse(readFileSync(join(root, 'desktop-profile', 'package.json'), 'utf8'));
+const versions = JSON.parse(readFileSync(join(root, 'versions.json'), 'utf8'));
 const pnpm = resolve(options['pnpm-entry'] ?? join(root, '..', 'node_modules', 'pnpm', 'bin', 'pnpm.mjs'));
-const retiredBundle = '@deepseek-ai/dsh-experimental-agent-team-profile';
+const retiredBundles = ['@deepseek-ai/dsh-experimental-agent-team-profile', 'dsh-purge'];
 const local = Object.entries(template.dependencies).filter(([, spec]) => spec.startsWith('file:'));
 const copies = local.map(([name, spec]) => {
   const folder = spec.split('/').at(-1);
-  const source = join(root, folder);
-  if (JSON.parse(readFileSync(join(source, 'package.json'), 'utf8')).name !== name) throw new Error(`Plugin package mismatch: ${folder}`);
+  const archive = folder.endsWith('.tgz');
+  const source = archive ? join(root, 'archives', folder) : join(root, folder);
+  if (archive) {
+    const actual = createHash('sha256').update(readFileSync(source)).digest('hex');
+    if (name !== 'dsh-purge-community' || actual !== versions.dshPurgeCommunitySha256) throw new Error(`Plugin archive mismatch: ${folder}`);
+  } else if (JSON.parse(readFileSync(join(source, 'package.json'), 'utf8')).name !== name) {
+    throw new Error(`Plugin package mismatch: ${folder}`);
+  }
   return { source, target: join(home, 'local-plugins', folder) };
 });
 const current = JSON.parse(readFileSync(manifestPath, 'utf8'));
@@ -37,7 +45,7 @@ if (!Array.isArray(current.dsh?.profile?.bundles)) throw new Error('Desktop prof
 if (!existsSync(pnpm)) throw new Error(`pnpm entry not found: ${pnpm}; run pnpm install in this checkout first.`);
 
 if (options.plan) {
-  const removeBundles = current.dsh.profile.bundles.filter(name => name === retiredBundle);
+  const removeBundles = current.dsh.profile.bundles.filter(name => retiredBundles.includes(name));
   console.log(JSON.stringify({ home, profile, dependencies: template.dependencies, copies, removeBundles, offline: !!options.offline }, null, 2));
 } else {
   await withFileLock(manifestPath, async () => {
@@ -52,14 +60,15 @@ if (options.plan) {
     const lock = existsSync(lockPath) ? readFileSync(lockPath) : undefined;
     writeFileSync(join(backup, 'package.json'), original, { mode: 0o600 });
     if (lock) writeFileSync(join(backup, 'pnpm-lock.yaml'), lock, { mode: 0o600 });
+    mkdirSync(join(backup, 'local-plugins'), { recursive: true });
     for (const { source, target } of copies) {
       if (existsSync(target)) cpSync(target, join(backup, 'local-plugins', target.split(/[\\/]/).at(-1)), { recursive: true });
       mkdirSync(dirname(target), { recursive: true });
       cpSync(source, target, { recursive: true });
     }
     manifest.dependencies = { ...manifest.dependencies, ...template.dependencies };
-    delete manifest.dependencies[retiredBundle];
-    manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter(name => name !== retiredBundle);
+    for (const name of retiredBundles) delete manifest.dependencies[name];
+    manifest.dsh.profile.bundles = manifest.dsh.profile.bundles.filter(name => !retiredBundles.includes(name));
     for (const name of template.dsh.profile.bundles) {
       if (!manifest.dsh.profile.bundles.includes(name)) manifest.dsh.profile.bundles.push(name);
     }
